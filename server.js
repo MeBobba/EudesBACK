@@ -24,6 +24,22 @@ function getClientIp(req) {
     return forwarded ? forwarded.split(',').shift() : req.connection.remoteAddress;
 }
 
+// Fonction pour vérifier si un utilisateur est banni
+async function checkBan(userId, ip, machineId) {
+    console.log('Checking ban status for:', { userId, ip, machineId });
+    return new Promise((resolve, reject) => {
+        db.query(
+            'SELECT * FROM bans WHERE (user_id = ? OR ip = ? OR machine_id = ?) AND (ban_expire = 0 OR ban_expire > UNIX_TIMESTAMP())',
+            [userId, ip, machineId],
+            (err, results) => {
+                if (err) return reject(err);
+                console.log('Ban check results:', results);
+                resolve(results.length > 0);
+            }
+        );
+    });
+}
+
 // Fonction pour générer des questions anti-robot
 function generateAntiRobotQuestion() {
     const num1 = Math.floor(Math.random() * 10);
@@ -36,7 +52,7 @@ function generateAntiRobotQuestion() {
 
 // Inscription
 app.post('/register', (req, res) => {
-    const { username, password, mail } = req.body;
+    const { username, password, mail, machine_id } = req.body;
     const hashedPassword = bcrypt.hashSync(password, 8);
     const account_created = Math.floor(Date.now() / 1000);
     const last_login = account_created;
@@ -44,8 +60,8 @@ app.post('/register', (req, res) => {
     const ip = getClientIp(req); // Utiliser la fonction pour obtenir l'IP
 
     db.query(
-        'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [username, hashedPassword, mail, account_created, last_login, motto, ip, ip],
+        'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current, machine_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [username, hashedPassword, mail, account_created, last_login, motto, ip, ip, machine_id],
         (err, result) => {
             if (err) return res.status(500).send('Server error');
             const token = jwt.sign({ id: result.insertId }, secretKey, { expiresIn: 86400 });
@@ -55,8 +71,9 @@ app.post('/register', (req, res) => {
 });
 
 // Connexion
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
+app.post('/login', async (req, res) => {
+    const { username, password, machine_id } = req.body;
+    const ip = getClientIp(req);
 
     db.query('SELECT * FROM users WHERE username = ?', [username], async (err, results) => {
         if (err) {
@@ -68,6 +85,12 @@ app.post('/login', (req, res) => {
         }
 
         const user = results[0];
+
+        // Vérifier les bannissements
+        const isBanned = await checkBan(user.id, ip, machine_id);
+        if (isBanned) {
+            return res.status(403).send('User is banned');
+        }
 
         try {
             const passwordIsValid = await bcrypt.compare(password, user.password);
@@ -83,7 +106,7 @@ app.post('/login', (req, res) => {
                 expiresIn: 86400
             });
 
-            db.query('UPDATE users SET is_logged_in = 1 WHERE id = ?', [user.id], (err, results) => {
+            db.query('UPDATE users SET is_logged_in = 1, machine_id = ? WHERE id = ?', [machine_id, user.id], (err, results) => {
                 if (err) {
                     console.error('Database error:', err);
                     return res.status(500).send('Server error');
@@ -106,6 +129,17 @@ app.post('/logout', verifyToken, (req, res) => {
         }
         res.status(200).send('User logged out successfully');
     });
+});
+
+// Endpoint pour vérifier si un utilisateur est banni
+app.get('/check-ban', verifyToken, async (req, res) => {
+    const ip = getClientIp(req);
+    const machineId = req.headers['user-agent']; // Utiliser l'User-Agent comme machine_id
+    const isBanned = await checkBan(req.userId, ip, machineId);
+    if (isBanned) {
+        return res.status(403).send('User is banned');
+    }
+    res.status(200).send('User is not banned');
 });
 
 // Tableau de bord utilisateur
