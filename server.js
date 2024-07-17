@@ -3,11 +3,14 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 const db = require('./db');
+require('dotenv').config();
 
 const app = express();
-const port = 3000;
-const secretKey = 'yourSecretKey';
+const port = process.env.PORT || 3000;
+const secretKey = process.env.SECRET_KEY || 'yourSecretKey';
 
 app.use(bodyParser.json());
 app.use(cors());
@@ -26,60 +29,47 @@ function getClientIp(req) {
 
 // Fonction pour vérifier si un utilisateur est banni
 async function checkBan(userId, ip, machineId) {
-    console.log('Checking ban status for:', { userId, ip, machineId });
-    return new Promise((resolve, reject) => {
-        db.query(
+    try {
+        const [results] = await db.promise().query(
             'SELECT * FROM bans WHERE (user_id = ? OR ip = ? OR machine_id = ?) AND (ban_expire = 0 OR ban_expire > UNIX_TIMESTAMP())',
-            [userId, ip, machineId],
-            (err, results) => {
-                if (err) return reject(err);
-                console.log('Ban check results:', results);
-                resolve(results.length > 0);
-            }
+            [userId, ip, machineId]
         );
-    });
-}
-
-// Fonction pour générer des questions anti-robot
-function generateAntiRobotQuestion() {
-    const num1 = Math.floor(Math.random() * 10);
-    const num2 = Math.floor(Math.random() * 10);
-    return {
-        question: `What is ${num1} + ${num2}?`,
-        answer: num1 + num2
-    };
+        return results.length > 0;
+    } catch (err) {
+        console.error('Error checking ban status:', err);
+        throw new Error('Server error');
+    }
 }
 
 // Inscription
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
     const { username, password, mail, machine_id } = req.body;
     const hashedPassword = bcrypt.hashSync(password, 8);
     const account_created = Math.floor(Date.now() / 1000);
     const last_login = account_created;
     const motto = 'Nouveau sur MeBobba';
-    const ip = getClientIp(req); // Utiliser la fonction pour obtenir l'IP
+    const ip = getClientIp(req);
 
-    db.query(
-        'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current, machine_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [username, hashedPassword, mail, account_created, last_login, motto, ip, ip, machine_id],
-        (err, result) => {
-            if (err) return res.status(500).send('Server error');
-            const token = jwt.sign({ id: result.insertId }, secretKey, { expiresIn: 86400 });
-            res.status(200).send({ auth: true, token });
-        }
-    );
+    try {
+        const [result] = await db.promise().query(
+            'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current, machine_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [username, hashedPassword, mail, account_created, last_login, motto, ip, ip, machine_id]
+        );
+        const token = jwt.sign({ id: result.insertId }, secretKey, { expiresIn: '24h' });
+        res.status(200).send({ auth: true, token });
+    } catch (err) {
+        console.error('Error registering user:', err);
+        res.status(500).send('Server error');
+    }
 });
 
 // Connexion
 app.post('/login', async (req, res) => {
-    const { username, password, machine_id } = req.body;
+    const { username, password, token2fa, machine_id } = req.body;
     const ip = getClientIp(req);
 
-    db.query('SELECT * FROM users WHERE username = ?', [username], async (err, results) => {
-        if (err) {
-            console.error('Database error:', err);
-            return res.status(500).send('Server error');
-        }
+    try {
+        const [results] = await db.promise().query('SELECT * FROM users WHERE username = ?', [username]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -92,87 +82,185 @@ app.post('/login', async (req, res) => {
             return res.status(403).send('User is banned');
         }
 
-        try {
-            const passwordIsValid = await bcrypt.compare(password, user.password);
-            if (!passwordIsValid) {
-                return res.status(401).send('Invalid password');
-            }
-
-            if (user.is_logged_in) {
-                return res.status(403).send('User already logged in');
-            }
-
-            const token = jwt.sign({ id: user.id, rank: user.rank }, secretKey, {
-                expiresIn: 86400
-            });
-
-            db.query('UPDATE users SET is_logged_in = 1, machine_id = ? WHERE id = ?', [machine_id, user.id], (err, results) => {
-                if (err) {
-                    console.error('Database error:', err);
-                    return res.status(500).send('Server error');
-                }
-                res.status(200).send({ auth: true, token });
-            });
-        } catch (error) {
-            console.error('Bcrypt error:', error);
-            return res.status(500).send('Server error');
+        const passwordIsValid = await bcrypt.compare(password, user.password);
+        if (!passwordIsValid) {
+            return res.status(401).send('Invalid password');
         }
-    });
+
+        if (user.is_logged_in) {
+            return res.status(403).send('User already logged in');
+        }
+
+        // Vérifier le token 2FA si activé
+        if (user.is_2fa_enabled) {
+            const verified = speakeasy.totp.verify({
+                secret: user.google_auth_secret,
+                encoding: 'base32',
+                token: token2fa,
+                window: 1 // Permet une légère dérive temporelle
+            });
+            if (!verified) {
+                return res.status(401).send('Invalid 2FA token');
+            }
+        }
+
+        const token = jwt.sign({ id: user.id, rank: user.rank }, secretKey, { expiresIn: '24h' });
+
+        await db.promise().query('UPDATE users SET is_logged_in = 1, machine_id = ? WHERE id = ?', [machine_id, user.id]);
+        res.status(200).send({ auth: true, token });
+    } catch (err) {
+        console.error('Error logging in user:', err);
+        res.status(500).send('Server error');
+    }
 });
 
 // Déconnexion
-app.post('/logout', verifyToken, (req, res) => {
-    db.query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [req.userId], (err, results) => {
-        if (err) {
-            console.error('Database error:', err);
-            return res.status(500).send('Server error');
-        }
+app.post('/logout', verifyToken, async (req, res) => {
+    try {
+        await db.promise().query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [req.userId]);
         res.status(200).send('User logged out successfully');
-    });
+    } catch (err) {
+        console.error('Error logging out user:', err);
+        res.status(500).send('Server error');
+    }
 });
 
-// Endpoint pour vérifier si un utilisateur est banni
-app.get('/check-ban', verifyToken, async (req, res) => {
-    const ip = getClientIp(req);
-    const machineId = req.headers['user-agent']; // Utiliser l'User-Agent comme machine_id
-    const isBanned = await checkBan(req.userId, ip, machineId);
-    if (isBanned) {
-        return res.status(403).send('User is banned');
+// Endpoint pour activer Google Authenticator
+app.post('/enable-2fa', verifyToken, async (req, res) => {
+    const secret = speakeasy.generateSecret({ length: 20 });
+    const url = speakeasy.otpauthURL({
+        secret: secret.base32,
+        label: 'MyApp',
+        issuer: 'MyApp'
+    });
+
+    // Stocker le secret dans la base de données de l'utilisateur
+    try {
+        await db.promise().query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret.base32, req.userId]);
+        qrcode.toDataURL(url, (err, data_url) => {
+            res.status(200).send({ secret: secret.base32, dataURL: data_url });
+        });
+    } catch (err) {
+        console.error('Error enabling 2FA:', err);
+        res.status(500).send('Server error');
     }
-    res.status(200).send('User is not banned');
+});
+
+// Endpoint pour vérifier le code Google Authenticator
+app.post('/verify-2fa', verifyToken, async (req, res) => {
+    const { token } = req.body;
+    try {
+        const [results] = await db.promise().query('SELECT google_auth_secret FROM users WHERE id = ?', [req.userId]);
+        const user = results[0];
+        const verified = speakeasy.totp.verify({
+            secret: user.google_auth_secret,
+            encoding: 'base32',
+            token,
+            window: 1 // Allow some time drift
+        });
+        if (verified) {
+            await db.promise().query('UPDATE users SET is_2fa_enabled = 1 WHERE id = ?', [req.userId]);
+            res.status(200).send('2FA enabled successfully');
+        } else {
+            res.status(400).send('Invalid token');
+        }
+    } catch (err) {
+        console.error('Error verifying 2FA:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour désactiver Google Authenticator
+app.post('/disable-2fa', verifyToken, async (req, res) => {
+    try {
+        await db.promise().query('UPDATE users SET is_2fa_enabled = 0, google_auth_secret = NULL WHERE id = ?', [req.userId]);
+        res.status(200).send('2FA disabled successfully');
+    } catch (err) {
+        console.error('Error disabling 2FA:', err);
+        res.status(500).send('Server error');
+    }
 });
 
 // Tableau de bord utilisateur
-app.get('/dashboard', verifyToken, (req, res) => {
-    db.query('SELECT * FROM users WHERE id = ?', [req.userId], (err, results) => {
-        if (err) return res.status(500).send('Server error');
-        if (results.length === 0) return res.status(404).send('User not found');
+app.get('/dashboard', verifyToken, async (req, res) => {
+    try {
+        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
         res.status(200).send(results[0]);
-    });
+    } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        res.status(500).send('Server error');
+    }
 });
 
 // Vérification du nom d'utilisateur
-app.post('/check-username', (req, res) => {
+app.post('/check-username', async (req, res) => {
     const { username } = req.body;
-    db.query('SELECT username FROM users WHERE username = ?', [username], (err, results) => {
-        if (err) return res.status(500).send('Server error');
+    try {
+        const [results] = await db.promise().query('SELECT username FROM users WHERE username = ?', [username]);
         res.status(200).send({ exists: results.length > 0 });
-    });
+    } catch (err) {
+        console.error('Error checking username:', err);
+        res.status(500).send('Server error');
+    }
 });
 
 // Vérification de l'email
-app.post('/check-email', (req, res) => {
+app.post('/check-email', async (req, res) => {
     const { email } = req.body;
-    db.query('SELECT mail FROM users WHERE mail = ?', [email], (err, results) => {
-        if (err) return res.status(500).send('Server error');
+    try {
+        const [results] = await db.promise().query('SELECT mail FROM users WHERE mail = ?', [email]);
         res.status(200).send({ exists: results.length > 0 });
-    });
+    } catch (err) {
+        console.error('Error checking email:', err);
+        res.status(500).send('Server error');
+    }
 });
 
 // Endpoint pour obtenir une question anti-robot
 app.get('/anti-robot-question', (req, res) => {
     const question = generateAntiRobotQuestion();
     res.status(200).send(question);
+});
+
+// Endpoint pour télécharger les données de l'utilisateur
+app.get('/download-data', verifyToken, async (req, res) => {
+    try {
+        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).json(results[0]);
+    } catch (err) {
+        console.error('Error downloading user data:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour supprimer le compte de l'utilisateur
+app.delete('/delete-account', verifyToken, async (req, res) => {
+    try {
+        await db.promise().query('DELETE FROM users WHERE id = ?', [req.userId]);
+        res.status(200).send('User account deleted successfully');
+    } catch (err) {
+        console.error('Error deleting user account:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour mettre à jour les données de l'utilisateur
+app.put('/update-account', verifyToken, async (req, res) => {
+    const { username, real_name, mail, motto, look, gender } = req.body;
+    try {
+        await db.promise().query('UPDATE users SET username = ?, real_name = ?, mail = ?, motto = ?, look = ?, gender = ? WHERE id = ?',
+            [username, real_name, mail, motto, look, gender, req.userId]);
+        res.status(200).send('User account updated successfully');
+    } catch (err) {
+        console.error('Error updating user account:', err);
+        res.status(500).send('Server error');
+    }
 });
 
 // Middleware de vérification du token
