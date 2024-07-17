@@ -130,8 +130,8 @@ app.post('/enable-2fa', verifyToken, async (req, res) => {
     const secret = speakeasy.generateSecret({ length: 20 });
     const url = speakeasy.otpauthURL({
         secret: secret.base32,
-        label: 'MyApp',
-        issuer: 'MyApp'
+        label: 'MeBobba',
+        issuer: 'Eudes'
     });
 
     // Stocker le secret dans la base de données de l'utilisateur
@@ -218,6 +218,16 @@ app.post('/check-email', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+// Fonction pour générer des questions anti-robot
+function generateAntiRobotQuestion() {
+    const num1 = Math.floor(Math.random() * 10);
+    const num2 = Math.floor(Math.random() * 10);
+    return {
+        question: `What is ${num1} + ${num2}?`,
+        answer: num1 + num2
+    };
+}
 
 // Endpoint pour obtenir une question anti-robot
 app.get('/anti-robot-question', (req, res) => {
