@@ -18,6 +18,12 @@ app.use((req, res, next) => {
     next();
 });
 
+// Fonction pour obtenir l'IP du client
+function getClientIp(req) {
+    const forwarded = req.headers['x-forwarded-for'];
+    return forwarded ? forwarded.split(',').shift() : req.connection.remoteAddress;
+}
+
 // Fonction pour générer des questions anti-robot
 function generateAntiRobotQuestion() {
     const num1 = Math.floor(Math.random() * 10);
@@ -35,7 +41,7 @@ app.post('/register', (req, res) => {
     const account_created = Math.floor(Date.now() / 1000);
     const last_login = account_created;
     const motto = 'Nouveau sur MeBobba';
-    const ip = req.ip; // récupérer l'IP de l'utilisateur
+    const ip = getClientIp(req); // Utiliser la fonction pour obtenir l'IP
 
     db.query(
         'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -47,7 +53,6 @@ app.post('/register', (req, res) => {
         }
     );
 });
-
 
 // Connexion
 app.post('/login', (req, res) => {
@@ -91,8 +96,6 @@ app.post('/login', (req, res) => {
         }
     });
 });
-
-
 
 // Déconnexion
 app.post('/logout', verifyToken, (req, res) => {
