@@ -434,13 +434,21 @@ app.get('/public-posts', verifyToken, async (req, res) => {
     }
 });
 
-// Endpoint for deleting a post
-app.delete('/posts/:postId', verifyToken, async (req, res) => {
+async function deletePostWithComments(postId, userId) {
     try {
-        const [result] = await db.promise().query('DELETE FROM posts WHERE id = ? AND user_id = ?', [req.params.postId, req.userId]);
-        if (result.affectedRows === 0) {
-            return res.status(404).send('Post not found or not authorized');
-        }
+        await db.promise().query('DELETE FROM comments WHERE post_id = ?', [postId]);
+        await db.promise().query('DELETE FROM likes WHERE post_id = ?', [postId]);
+        await db.promise().query('DELETE FROM posts WHERE id = ? AND user_id = ?', [postId, userId]);
+    } catch (err) {
+        throw err;
+    }
+}
+
+// Endpoint pour supprimer un post
+app.delete('/posts/:postId', verifyToken, async (req, res) => {
+    const { postId } = req.params;
+    try {
+        await deletePostWithComments(postId, req.userId);
         res.status(200).send('Post deleted successfully');
     } catch (err) {
         console.error('Error deleting post:', err);
@@ -448,37 +456,7 @@ app.delete('/posts/:postId', verifyToken, async (req, res) => {
     }
 });
 
-// Endpoint for deleting a comment
-app.delete('/comments/:commentId', verifyToken, async (req, res) => {
-    try {
-        const [result] = await db.promise().query('DELETE FROM comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
-        if (result.affectedRows === 0) {
-            return res.status(404).send('Comment not found or not authorized');
-        }
-        res.status(200).send('Comment deleted successfully');
-    } catch (err) {
-        console.error('Error deleting comment:', err);
-        res.status(500).send('Server error');
-    }
-});
-
-
-// Endpoint for deleting a comment
-app.delete('/comments/:commentId', verifyToken, async (req, res) => {
-    try {
-        const [result] = await db.promise().query('DELETE FROM comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
-        if (result.affectedRows === 0) {
-            return res.status(404).send('Comment not found or not authorized');
-        }
-        res.status(200).send('Comment deleted successfully');
-    } catch (err) {
-        console.error('Error deleting comment:', err);
-        res.status(500).send('Server error');
-    }
-});
-
-
-// Endpoint for deleting a comment
+// Endpoint pour supprimer un commentaire
 app.delete('/comments/:commentId', verifyToken, async (req, res) => {
     try {
         const [result] = await db.promise().query('DELETE FROM comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
@@ -496,11 +474,15 @@ app.delete('/comments/:commentId', verifyToken, async (req, res) => {
 app.post('/comments', verifyToken, async (req, res) => {
     const { postId, content } = req.body;
     try {
-        await db.promise().query(
+        const [result] = await db.promise().query(
             'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
             [postId, req.userId, content]
         );
-        res.status(201).send('Comment added');
+        const [comment] = await db.promise().query(
+            'SELECT comments.*, users.username, users.look FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?',
+            [result.insertId]
+        );
+        res.status(201).send(comment[0]);
     } catch (err) {
         console.error('Error adding comment:', err);
         res.status(500).send('Server error');
@@ -534,7 +516,6 @@ app.post('/likes', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
 
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
