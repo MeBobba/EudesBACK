@@ -41,6 +41,41 @@ async function checkBan(userId, ip, machineId) {
     }
 }
 
+// Ajout de la route /check-ban
+app.get('/check-ban', verifyToken, async (req, res) => {
+    const ip = getClientIp(req);
+    const machineId = req.headers['machine-id'];
+
+    try {
+        const isBanned = await checkBan(req.userId, ip, machineId);
+        if (isBanned) {
+            return res.status(403).send('User is banned');
+        }
+        res.status(200).send('User is not banned');
+    } catch (err) {
+        console.error('Error checking ban status:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Ajout de la route /check-2fa
+app.get('/check-2fa', async (req, res) => {
+    const { username } = req.query;
+
+    try {
+        const [results] = await db.promise().query('SELECT is_2fa_enabled FROM users WHERE username = ?', [username]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+
+        const user = results[0];
+        res.status(200).send({ is2FAEnabled: user.is_2fa_enabled });
+    } catch (err) {
+        console.error('Error checking 2FA status:', err);
+        res.status(500).send('Server error');
+    }
+});
+
 // Inscription
 app.post('/register', async (req, res) => {
     const { username, password, mail, machine_id } = req.body;
