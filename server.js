@@ -308,6 +308,234 @@ app.put('/update-account', verifyToken, async (req, res) => {
     }
 });
 
+// Endpoint pour créer un nouveau post
+app.post('/posts', verifyToken, async (req, res) => {
+    const { content, image, visibility } = req.body;
+    try {
+        const [result] = await db.promise().query(
+            'INSERT INTO posts (user_id, content, image, visibility) VALUES (?, ?, ?, ?)',
+            [req.userId, content, image, visibility]
+        );
+        res.status(201).send({ postId: result.insertId });
+    } catch (err) {
+        console.error('Error creating post:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour récupérer les posts de l'utilisateur
+app.get('/posts', verifyToken, async (req, res) => {
+    try {
+        const [posts] = await db.promise().query(
+            `SELECT posts.*, users.username, users.look,
+            COALESCE(likesCount.likesCount, 0) as likesCount,
+            COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+            userLikes.is_like as userLike
+            FROM posts
+            JOIN users ON posts.user_id = users.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) as likesCount 
+                FROM likes 
+                WHERE is_like = true 
+                GROUP BY post_id
+            ) likesCount ON posts.id = likesCount.post_id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) as commentsCount 
+                FROM comments 
+                GROUP BY post_id
+            ) commentsCount ON posts.id = commentsCount.post_id
+            LEFT JOIN (
+                SELECT post_id, is_like 
+                FROM likes 
+                WHERE user_id = ?
+            ) userLikes ON posts.id = userLikes.post_id
+            WHERE posts.user_id = ? OR posts.visibility = "public"
+            OR (posts.visibility = "friends" AND posts.user_id IN (
+                SELECT CASE
+                    WHEN user_one_id = ? THEN user_two_id
+                    WHEN user_two_id = ? THEN user_one_id
+                END AS friend_id
+                FROM messenger_friendships
+                WHERE user_one_id = ? OR user_two_id = ?
+            ))
+            ORDER BY posts.created_at DESC`,
+            [req.userId, req.userId, req.userId, req.userId, req.userId, req.userId]
+        );
+
+        for (let post of posts) {
+            const [comments] = await db.promise().query(
+                `SELECT comments.*, users.username, users.look
+                FROM comments
+                JOIN users ON comments.user_id = users.id
+                WHERE comments.post_id = ?
+                ORDER BY comments.created_at DESC`,
+                [post.id]
+            );
+            post.comments = comments;
+        }
+
+        res.status(200).send(posts);
+    } catch (err) {
+        console.error('Error fetching posts:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint for retrieving public posts with pagination
+app.get('/public-posts', verifyToken, async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+    try {
+        const [posts] = await db.promise().query(
+            `SELECT DISTINCT posts.*, users.username, users.look,
+            COALESCE(likesCount.likesCount, 0) as likesCount,
+            COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+            userLikes.is_like as userLike
+            FROM posts
+            JOIN users ON posts.user_id = users.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) as likesCount 
+                FROM likes 
+                WHERE is_like = true 
+                GROUP BY post_id
+            ) likesCount ON posts.id = likesCount.post_id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) as commentsCount 
+                FROM comments 
+                GROUP BY post_id
+            ) commentsCount ON posts.id = commentsCount.post_id
+            LEFT JOIN (
+                SELECT post_id, is_like 
+                FROM likes 
+                WHERE user_id = ?
+            ) userLikes ON posts.id = userLikes.post_id
+            WHERE posts.visibility = 'public'
+            ORDER BY posts.created_at DESC
+            LIMIT ? OFFSET ?`,
+            [req.userId, parseInt(limit), parseInt(offset)]
+        );
+
+        for (let post of posts) {
+            const [comments] = await db.promise().query(
+                `SELECT comments.*, users.username, users.look
+                FROM comments
+                JOIN users ON comments.user_id = users.id
+                WHERE comments.post_id = ?
+                ORDER BY comments.created_at DESC`,
+                [post.id]
+            );
+            post.comments = comments;
+        }
+
+        res.status(200).send(posts);
+    } catch (err) {
+        console.error('Error fetching public posts:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint for deleting a post
+app.delete('/posts/:postId', verifyToken, async (req, res) => {
+    try {
+        const [result] = await db.promise().query('DELETE FROM posts WHERE id = ? AND user_id = ?', [req.params.postId, req.userId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Post not found or not authorized');
+        }
+        res.status(200).send('Post deleted successfully');
+    } catch (err) {
+        console.error('Error deleting post:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint for deleting a comment
+app.delete('/comments/:commentId', verifyToken, async (req, res) => {
+    try {
+        const [result] = await db.promise().query('DELETE FROM comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Comment not found or not authorized');
+        }
+        res.status(200).send('Comment deleted successfully');
+    } catch (err) {
+        console.error('Error deleting comment:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
+// Endpoint for deleting a comment
+app.delete('/comments/:commentId', verifyToken, async (req, res) => {
+    try {
+        const [result] = await db.promise().query('DELETE FROM comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Comment not found or not authorized');
+        }
+        res.status(200).send('Comment deleted successfully');
+    } catch (err) {
+        console.error('Error deleting comment:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
+// Endpoint for deleting a comment
+app.delete('/comments/:commentId', verifyToken, async (req, res) => {
+    try {
+        const [result] = await db.promise().query('DELETE FROM comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Comment not found or not authorized');
+        }
+        res.status(200).send('Comment deleted successfully');
+    } catch (err) {
+        console.error('Error deleting comment:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour commenter un post
+app.post('/comments', verifyToken, async (req, res) => {
+    const { postId, content } = req.body;
+    try {
+        await db.promise().query(
+            'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
+            [postId, req.userId, content]
+        );
+        res.status(201).send('Comment added');
+    } catch (err) {
+        console.error('Error adding comment:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour liker/disliker un post
+app.post('/likes', verifyToken, async (req, res) => {
+    const { postId, isLike } = req.body;
+    try {
+        const [existingLike] = await db.promise().query(
+            'SELECT * FROM likes WHERE post_id = ? AND user_id = ?',
+            [postId, req.userId]
+        );
+
+        if (existingLike.length > 0) {
+            await db.promise().query(
+                'UPDATE likes SET is_like = ? WHERE id = ?',
+                [isLike, existingLike[0].id]
+            );
+        } else {
+            await db.promise().query(
+                'INSERT INTO likes (post_id, user_id, is_like) VALUES (?, ?, ?)',
+                [postId, req.userId, isLike]
+            );
+        }
+
+        res.status(201).send('Like/dislike added');
+    } catch (err) {
+        console.error('Error adding like/dislike:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
     const token = req.headers['x-access-token'];
