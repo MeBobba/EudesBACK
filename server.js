@@ -503,13 +503,10 @@ async function deletePostWithComments(postId) {
     }
 }
 
-
-
-
 // Endpoint pour supprimer un commentaire
 app.delete('/comments/:commentId', verifyToken, async (req, res) => {
     try {
-        const [result] = await db.promise().query('DELETE FROM comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
+        const [result] = await db.promise().query('DELETE FROM article_comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
         if (result.affectedRows === 0) {
             return res.status(404).send('Comment not found or not authorized');
         }
@@ -622,8 +619,6 @@ app.get('/search-users', verifyToken, async (req, res) => {
     }
 });
 
-
-
 // Tableau de bord utilisateur
 app.get('/dashboard/:userId', verifyToken, async (req, res) => {
     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
@@ -639,7 +634,6 @@ app.get('/dashboard/:userId', verifyToken, async (req, res) => {
     }
 });
 
-
 // Endpoint pour récupérer les photos de l'utilisateur
 app.get('/user-photos/:userId', verifyToken, async (req, res) => {
     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
@@ -654,7 +648,6 @@ app.get('/user-photos/:userId', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
 
 // Endpoint pour récupérer les posts de l'utilisateur
 app.get('/posts/:userId', verifyToken, async (req, res) => {
@@ -707,6 +700,205 @@ app.get('/posts/:userId', verifyToken, async (req, res) => {
     }
 });
 
+// Endpoint pour récupérer la liste des articles
+app.get('/articles', async (req, res) => {
+    try {
+        const [articles] = await db.promise().query('SELECT * FROM articles ORDER BY date DESC');
+        res.status(200).send(articles);
+    } catch (error) {
+        console.error('Error fetching articles:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour récupérer un article par ID
+app.get('/articles/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const userId = req.userId; // Assurez-vous que verifyToken est utilisé pour définir req.userId
+
+    try {
+        const [articles] = await db.promise().query('SELECT * FROM articles WHERE id = ?', [id]);
+        if (articles.length === 0) {
+            return res.status(404).send('Article not found');
+        }
+
+        const article = articles[0];
+
+        // Récupérer le nombre de likes
+        const [[likesCount]] = await db.promise().query(
+            'SELECT COUNT(*) AS likesCount FROM article_likes WHERE article_id = ? AND is_like = true',
+            [id]
+        );
+
+        // Récupérer le nombre de commentaires
+        const [[commentsCount]] = await db.promise().query(
+            'SELECT COUNT(*) AS commentsCount FROM article_comments WHERE article_id = ?',
+            [id]
+        );
+
+        // Vérifier si l'utilisateur a liké l'article
+        const [[userLike]] = await db.promise().query(
+            'SELECT is_like FROM article_likes WHERE article_id = ? AND user_id = ?',
+            [id, userId]
+        );
+
+        // Récupérer les commentaires
+        const [comments] = await db.promise().query(
+            `SELECT article_comments.*, users.username, users.look 
+            FROM article_comments 
+            JOIN users ON article_comments.user_id = users.id 
+            WHERE article_comments.article_id = ? 
+            ORDER BY article_comments.created_at DESC`,
+            [id]
+        );
+
+        article.likesCount = likesCount.likesCount;
+        article.commentsCount = commentsCount.commentsCount;
+        article.userLike = userLike ? userLike.is_like : null;
+        article.comments = comments;
+
+        res.status(200).send(article);
+    } catch (error) {
+        console.error('Error fetching article:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint for liking/disliking an article
+app.post('/articles/:articleId/likes', verifyToken, async (req, res) => {
+    const { articleId } = req.params;
+    const { isLike } = req.body;
+    try {
+        const [existingLike] = await db.promise().query(
+            'SELECT * FROM article_likes WHERE article_id = ? AND user_id = ?',
+            [articleId, req.userId]
+        );
+
+        if (existingLike.length > 0) {
+            await db.promise().query(
+                'UPDATE article_likes SET is_like = ? WHERE id = ?',
+                [isLike, existingLike[0].id]
+            );
+        } else {
+            await db.promise().query(
+                'INSERT INTO article_likes (article_id, user_id, is_like) VALUES (?, ?, ?)',
+                [articleId, req.userId, isLike]
+            );
+        }
+
+        const [[likeStatus]] = await db.promise().query(
+            'SELECT is_like FROM article_likes WHERE article_id = ? AND user_id = ?',
+            [articleId, req.userId]
+        );
+
+        const [[likesCount]] = await db.promise().query(
+            'SELECT COUNT(*) AS likesCount FROM article_likes WHERE article_id = ? AND is_like = true',
+            [articleId]
+        );
+
+        res.status(201).send({ userLike: likeStatus.is_like, likesCount: likesCount.likesCount });
+    } catch (err) {
+        console.error('Error adding like/dislike:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint for commenting on an article
+app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
+    const { articleId } = req.params;
+    const { content } = req.body;
+
+    try {
+        const [[user]] = await db.promise().query('SELECT last_comment_time FROM users WHERE id = ?', [req.userId]);
+
+        const currentTime = Math.floor(Date.now() / 1000);
+
+        if (user.last_comment_time && (currentTime - user.last_comment_time < 15)) {
+            return res.status(429).send('You must wait 15 seconds before commenting again.');
+        }
+
+        const [result] = await db.promise().query(
+            'INSERT INTO article_comments (article_id, user_id, content) VALUES (?, ?, ?)',
+            [articleId, req.userId, content]
+        );
+
+        await db.promise().query('UPDATE users SET last_comment_time = ? WHERE id = ?', [currentTime, req.userId]);
+
+        const [comment] = await db.promise().query(
+            'SELECT article_comments.*, users.username, users.look FROM article_comments JOIN users ON article_comments.user_id = users.id WHERE article_comments.id = ?',
+            [result.insertId]
+        );
+
+        res.status(201).send(comment[0]);
+    } catch (err) {
+        console.error('Error adding comment:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
+// Endpoint for deleting a comment
+app.delete('/comments/:commentId', verifyToken, async (req, res) => {
+    try {
+        const [result] = await db.promise().query('DELETE FROM article_comments WHERE id = ? AND user_id = ?', [req.params.commentId, req.userId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Comment not found or not authorized');
+        }
+        res.status(200).send('Comment deleted successfully');
+    } catch (err) {
+        console.error('Error deleting comment:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+app.post('/articles', verifyToken, async (req, res) => {
+    const { title, summary, content, image } = req.body;
+    if (req.userRank < 5) {
+        return res.status(403).send('Not authorized to create articles');
+    }
+    try {
+        const [result] = await db.promise().query(
+            'INSERT INTO articles (title, summary, content, image) VALUES (?, ?, ?, ?)',
+            [title, summary, content, image]
+        );
+        res.status(201).send({ id: result.insertId, title, summary, content, image });
+    } catch (err) {
+        console.error('Error creating article:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+app.put('/articles/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const { title, summary, content, image } = req.body;
+    if (req.userRank < 5) {
+        return res.status(403).send('Not authorized to edit articles');
+    }
+    try {
+        await db.promise().query(
+            'UPDATE articles SET title = ?, summary = ?, content = ?, image = ? WHERE id = ?',
+            [title, summary, content, image, id]
+        );
+        res.status(200).send('Article updated successfully');
+    } catch (err) {
+        console.error('Error updating article:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+app.delete('/articles/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    if (req.userRank < 5) {
+        return res.status(403).send('Not authorized to delete articles');
+    }
+    try {
+        await db.promise().query('DELETE FROM articles WHERE id = ?', [id]);
+        res.status(200).send('Article deleted successfully');
+    } catch (err) {
+        console.error('Error deleting article:', err);
+        res.status(500).send('Server error');
+    }
+});
 
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
@@ -720,8 +912,6 @@ function verifyToken(req, res, next) {
         next();
     });
 }
-
-
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
