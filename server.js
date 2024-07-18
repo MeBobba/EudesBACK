@@ -311,11 +311,22 @@ app.put('/update-account', verifyToken, async (req, res) => {
 // Endpoint pour créer un nouveau post
 app.post('/posts', verifyToken, async (req, res) => {
     const { content, image, video, visibility } = req.body;
+
     try {
+        const [[user]] = await db.promise().query('SELECT rank, last_post_time FROM users WHERE id = ?', [req.userId]);
+
+        const currentTime = Math.floor(Date.now() / 1000);
+
+        if (user.rank < 5 && user.last_post_time && (currentTime - user.last_post_time < 15)) {
+            return res.status(429).send('You must wait 15 seconds before posting again.');
+        }
+
         const [result] = await db.promise().query(
-            'INSERT INTO posts (user_id, content, image, video, visibility) VALUES (?, ?, ?, ?, ?)',
-            [req.userId, content, image, video, visibility]
+            'INSERT INTO posts (user_id, content, image, video, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [req.userId, content, image, video, visibility, new Date()]
         );
+
+        await db.promise().query('UPDATE users SET last_post_time = ? WHERE id = ?', [currentTime, req.userId]);
 
         const [newPost] = await db.promise().query(
             `SELECT posts.*, users.username, users.look
@@ -458,26 +469,42 @@ async function deletePostWithComments(postId) {
 app.delete('/posts/:postId', verifyToken, async (req, res) => {
     const { postId } = req.params;
     try {
-        const [post] = await db.promise().query('SELECT * FROM posts WHERE id = ?', [postId]);
-        if (post.length === 0) {
+        const [[user]] = await db.promise().query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+        const userRank = user.rank;
+
+        const [[post]] = await db.promise().query('SELECT user_id FROM posts WHERE id = ?', [postId]);
+        if (!post) {
             return res.status(404).send('Post not found');
         }
 
-        const userId = req.userId;
-        const userRank = req.userRank;
-        const postOwnerId = post[0].user_id;
+        const postOwnerId = post.user_id;
 
-        if (userId !== postOwnerId && userRank < 5) {
-            return res.status(403).send('You do not have permission to delete this post');
+        if (userRank < 5 && postOwnerId !== req.userId) {
+            return res.status(403).send('Not authorized to delete this post');
         }
 
         await deletePostWithComments(postId);
+
         res.status(200).send('Post deleted successfully');
     } catch (err) {
-        console.error('Error deleting post:', err);
+        console.error('Error deleting post:', err); // Log the error
         res.status(500).send('Server error');
     }
 });
+
+async function deletePostWithComments(postId) {
+    try {
+        await db.promise().query('DELETE FROM comments WHERE post_id = ?', [postId]);
+        await db.promise().query('DELETE FROM likes WHERE post_id = ?', [postId]);
+        await db.promise().query('DELETE FROM posts WHERE id = ?', [postId]);
+    } catch (err) {
+        console.error('Error in deletePostWithComments:', err); // Log the error
+        throw err;
+    }
+}
+
+
+
 
 // Endpoint pour supprimer un commentaire
 app.delete('/comments/:commentId', verifyToken, async (req, res) => {
