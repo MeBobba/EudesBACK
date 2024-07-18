@@ -444,11 +444,11 @@ app.get('/public-posts', verifyToken, async (req, res) => {
     }
 });
 
-async function deletePostWithComments(postId, userId) {
+async function deletePostWithComments(postId) {
     try {
         await db.promise().query('DELETE FROM comments WHERE post_id = ?', [postId]);
         await db.promise().query('DELETE FROM likes WHERE post_id = ?', [postId]);
-        await db.promise().query('DELETE FROM posts WHERE id = ? AND user_id = ?', [postId, userId]);
+        await db.promise().query('DELETE FROM posts WHERE id = ?', [postId]);
     } catch (err) {
         throw err;
     }
@@ -458,7 +458,20 @@ async function deletePostWithComments(postId, userId) {
 app.delete('/posts/:postId', verifyToken, async (req, res) => {
     const { postId } = req.params;
     try {
-        await deletePostWithComments(postId, req.userId);
+        const [post] = await db.promise().query('SELECT * FROM posts WHERE id = ?', [postId]);
+        if (post.length === 0) {
+            return res.status(404).send('Post not found');
+        }
+
+        const userId = req.userId;
+        const userRank = req.userRank;
+        const postOwnerId = post[0].user_id;
+
+        if (userId !== postOwnerId && userRank < 5) {
+            return res.status(403).send('You do not have permission to delete this post');
+        }
+
+        await deletePostWithComments(postId);
         res.status(200).send('Post deleted successfully');
     } catch (err) {
         console.error('Error deleting post:', err);
@@ -643,17 +656,9 @@ app.get('/posts/:userId', verifyToken, async (req, res) => {
                 FROM likes 
                 WHERE user_id = ?
             ) userLikes ON posts.id = userLikes.post_id
-            WHERE posts.user_id = ? AND (posts.visibility = "public"
-            OR (posts.visibility = "friends" AND posts.user_id IN (
-                SELECT CASE
-                    WHEN user_one_id = ? THEN user_two_id
-                    WHEN user_two_id = ? THEN user_one_id
-                END AS friend_id
-                FROM messenger_friendships
-                WHERE user_one_id = ? OR user_two_id = ?
-            )))
+            WHERE posts.user_id = ? AND posts.visibility = "public"
             ORDER BY posts.created_at DESC`,
-            [req.userId, userId, req.userId, req.userId, req.userId, req.userId]
+            [req.userId, userId]
         );
 
         for (let post of posts) {
@@ -675,17 +680,20 @@ app.get('/posts/:userId', verifyToken, async (req, res) => {
     }
 });
 
+
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
     const token = req.headers['x-access-token'];
     if (!token) return res.status(403).send('No token provided');
 
-    jwt.verify(token, secretKey, (err, decoded) => {
+    jwt.verify(token, secretKey, async (err, decoded) => {
         if (err) return res.status(500).send('Failed to authenticate token');
         req.userId = decoded.id;
+        req.userRank = decoded.rank;
         next();
     });
 }
+
 
 
 // Gestion des erreurs 404
