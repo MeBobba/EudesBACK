@@ -531,6 +531,139 @@ app.get('/user-photos', verifyToken, async (req, res) => {
     }
 });
 
+// Route pour récupérer le profil de l'utilisateur courant
+app.get('/profile/me', verifyToken, async (req, res) => {
+    try {
+        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).send(results[0]);
+    } catch (err) {
+        console.error('Error fetching user profile:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Route pour récupérer le profil d'un utilisateur par ID
+app.get('/profile/:userId', verifyToken, async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const [users] = await db.promise().query('SELECT * FROM users WHERE id = ?', [userId]);
+        if (users.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).send(users[0]);
+    } catch (err) {
+        console.error('Error fetching user profile:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Ajout de la route pour la recherche d'utilisateurs
+app.get('/search-users', verifyToken, async (req, res) => {
+    const { query } = req.query;
+    try {
+        const [results] = await db.promise().query('SELECT id, username FROM users WHERE username LIKE ?', [`%${query}%`]);
+        res.status(200).send(results);
+    } catch (err) {
+        console.error('Error searching users:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
+
+// Tableau de bord utilisateur
+app.get('/dashboard/:userId', verifyToken, async (req, res) => {
+    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+    try {
+        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).send(results[0]);
+    } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
+// Endpoint pour récupérer les photos de l'utilisateur
+app.get('/user-photos/:userId', verifyToken, async (req, res) => {
+    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+    try {
+        const [photos] = await db.promise().query(
+            'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
+            [userId]
+        );
+        res.status(200).send(photos);
+    } catch (err) {
+        console.error('Error fetching user photos:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
+// Endpoint pour récupérer les posts de l'utilisateur
+app.get('/posts/:userId', verifyToken, async (req, res) => {
+    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+    try {
+        const [posts] = await db.promise().query(
+            `SELECT posts.*, users.username, users.look,
+            COALESCE(likesCount.likesCount, 0) as likesCount,
+            COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+            userLikes.is_like as userLike
+            FROM posts
+            JOIN users ON posts.user_id = users.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) as likesCount 
+                FROM likes 
+                WHERE is_like = true 
+                GROUP BY post_id
+            ) likesCount ON posts.id = likesCount.post_id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) as commentsCount 
+                FROM comments 
+                GROUP BY post_id
+            ) commentsCount ON posts.id = commentsCount.post_id
+            LEFT JOIN (
+                SELECT post_id, is_like 
+                FROM likes 
+                WHERE user_id = ?
+            ) userLikes ON posts.id = userLikes.post_id
+            WHERE posts.user_id = ? AND (posts.visibility = "public"
+            OR (posts.visibility = "friends" AND posts.user_id IN (
+                SELECT CASE
+                    WHEN user_one_id = ? THEN user_two_id
+                    WHEN user_two_id = ? THEN user_one_id
+                END AS friend_id
+                FROM messenger_friendships
+                WHERE user_one_id = ? OR user_two_id = ?
+            )))
+            ORDER BY posts.created_at DESC`,
+            [req.userId, userId, req.userId, req.userId, req.userId, req.userId]
+        );
+
+        for (let post of posts) {
+            const [comments] = await db.promise().query(
+                `SELECT comments.*, users.username, users.look
+                FROM comments
+                JOIN users ON comments.user_id = users.id
+                WHERE comments.post_id = ?
+                ORDER BY comments.created_at DESC`,
+                [post.id]
+            );
+            post.comments = comments;
+        }
+
+        res.status(200).send(posts);
+    } catch (err) {
+        console.error('Error fetching posts:', err);
+        res.status(500).send('Server error');
+    }
+});
 
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
@@ -540,10 +673,10 @@ function verifyToken(req, res, next) {
     jwt.verify(token, secretKey, (err, decoded) => {
         if (err) return res.status(500).send('Failed to authenticate token');
         req.userId = decoded.id;
-        req.userRank = decoded.rank;
         next();
     });
 }
+
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
