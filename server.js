@@ -316,12 +316,22 @@ app.post('/posts', verifyToken, async (req, res) => {
             'INSERT INTO posts (user_id, content, image, video, visibility) VALUES (?, ?, ?, ?, ?)',
             [req.userId, content, image, video, visibility]
         );
-        res.status(201).send({ postId: result.insertId });
+
+        const [newPost] = await db.promise().query(
+            `SELECT posts.*, users.username, users.look
+            FROM posts
+            JOIN users ON posts.user_id = users.id
+            WHERE posts.id = ?`,
+            [result.insertId]
+        );
+
+        res.status(201).send(newPost[0]);
     } catch (err) {
         console.error('Error creating post:', err);
         res.status(500).send('Server error');
     }
 });
+
 
 // Endpoint pour récupérer les posts de l'utilisateur
 app.get('/posts', verifyToken, async (req, res) => {
