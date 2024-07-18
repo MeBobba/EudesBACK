@@ -82,7 +82,7 @@ app.post('/register', async (req, res) => {
     const hashedPassword = bcrypt.hashSync(password, 8);
     const account_created = Math.floor(Date.now() / 1000);
     const last_login = account_created;
-    const motto = 'Nouveau sur MeBobba';
+    const motto = 'Nouveau sur EudesCMS';
     const ip = getClientIp(req);
 
     try {
@@ -165,7 +165,7 @@ app.post('/enable-2fa', verifyToken, async (req, res) => {
     const secret = speakeasy.generateSecret({ length: 20 });
     const url = speakeasy.otpauthURL({
         secret: secret.base32,
-        label: 'MeBobba',
+        label: 'EudesCMS',
         issuer: 'Eudes'
     });
 
