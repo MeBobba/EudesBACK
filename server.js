@@ -536,6 +536,7 @@ app.post('/comments', verifyToken, async (req, res) => {
     }
 });
 
+
 // Endpoint pour liker/disliker un post
 app.post('/likes', verifyToken, async (req, res) => {
     const { postId, isLike } = req.body;
@@ -546,10 +547,19 @@ app.post('/likes', verifyToken, async (req, res) => {
         );
 
         if (existingLike.length > 0) {
-            await db.promise().query(
-                'UPDATE likes SET is_like = ? WHERE id = ?',
-                [isLike, existingLike[0].id]
-            );
+            if (existingLike[0].is_like === isLike) {
+                // If the same like status is being sent, remove the like
+                await db.promise().query(
+                    'DELETE FROM likes WHERE id = ?',
+                    [existingLike[0].id]
+                );
+            } else {
+                // Otherwise, update the like status
+                await db.promise().query(
+                    'UPDATE likes SET is_like = ? WHERE id = ?',
+                    [isLike, existingLike[0].id]
+                );
+            }
         } else {
             await db.promise().query(
                 'INSERT INTO likes (post_id, user_id, is_like) VALUES (?, ?, ?)',
@@ -557,12 +567,23 @@ app.post('/likes', verifyToken, async (req, res) => {
             );
         }
 
-        res.status(201).send('Like/dislike added');
+        const [[likeStatus]] = await db.promise().query(
+            'SELECT is_like FROM likes WHERE post_id = ? AND user_id = ?',
+            [postId, req.userId]
+        );
+
+        const [[likesCount]] = await db.promise().query(
+            'SELECT COUNT(*) AS likesCount FROM likes WHERE post_id = ? AND is_like = true',
+            [postId]
+        );
+
+        res.status(201).send({ userLike: likeStatus ? likeStatus.is_like : null, likesCount: likesCount.likesCount });
     } catch (err) {
         console.error('Error adding like/dislike:', err);
         res.status(500).send('Server error');
     }
 });
+
 
 // Endpoint pour récupérer les photos de l'utilisateur
 app.get('/user-photos', verifyToken, async (req, res) => {
@@ -591,6 +612,33 @@ app.get('/profile/me', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+// Endpoint pour récupérer les jeux
+app.get('/games', async (req, res) => {
+    try {
+        const [games] = await db.promise().query('SELECT * FROM games');
+        res.status(200).send(games);
+    } catch (error) {
+        console.error('Error fetching games:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour récupérer les jeux par ID
+app.get('/games/:id', async (req, res) => {
+    try {
+        const [games] = await db.promise().query('SELECT * FROM games WHERE id = ?', [req.params.id]);
+        if (games.length === 0) {
+            return res.status(404).send('Game not found');
+        }
+        res.status(200).send(games[0]);
+    } catch (error) {
+        console.error('Error fetching game by ID:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+
 
 // Route pour récupérer le profil d'un utilisateur par ID
 app.get('/profile/:userId', verifyToken, async (req, res) => {
