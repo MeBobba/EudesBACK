@@ -310,11 +310,11 @@ app.put('/update-account', verifyToken, async (req, res) => {
 
 // Endpoint pour créer un nouveau post
 app.post('/posts', verifyToken, async (req, res) => {
-    const { content, image, visibility } = req.body;
+    const { content, image, video, visibility } = req.body;
     try {
         const [result] = await db.promise().query(
-            'INSERT INTO posts (user_id, content, image, visibility) VALUES (?, ?, ?, ?)',
-            [req.userId, content, image, visibility]
+            'INSERT INTO posts (user_id, content, image, video, visibility) VALUES (?, ?, ?, ?, ?)',
+            [req.userId, content, image, video, visibility]
         );
         res.status(201).send({ postId: result.insertId });
     } catch (err) {
