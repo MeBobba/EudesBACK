@@ -517,6 +517,21 @@ app.post('/likes', verifyToken, async (req, res) => {
     }
 });
 
+// Endpoint pour récupérer les photos de l'utilisateur
+app.get('/user-photos', verifyToken, async (req, res) => {
+    try {
+        const [photos] = await db.promise().query(
+            'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
+            [req.userId]
+        );
+        res.status(200).send(photos);
+    } catch (err) {
+        console.error('Error fetching user photos:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
     const token = req.headers['x-access-token'];
