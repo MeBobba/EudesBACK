@@ -15,6 +15,12 @@ const secretKey = process.env.SECRET_KEY || 'yourSecretKey';
 app.use(bodyParser.json());
 app.use(cors());
 
+// Endpoint pour vérifier la validité de la session
+app.get('/check-session', verifyToken, (req, res) => {
+    res.status(200).send({ valid: true });
+});
+
+
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-access-token');
@@ -26,6 +32,42 @@ function getClientIp(req) {
     const forwarded = req.headers['x-forwarded-for'];
     return forwarded ? forwarded.split(',').shift() : req.connection.remoteAddress;
 }
+
+// Endpoint pour vérifier l'existence d'une piste
+app.get('/tracks/:spotifyId', (req, res) => {
+    const spotifyId = req.params.spotifyId;
+    db.query('SELECT * FROM tracks WHERE spotify_id = ?', [spotifyId], (error, results) => {
+        if (error) {
+            console.error('Error checking track existence:', error);
+            res.status(500).send('Server error');
+        } else {
+            res.send({ exists: results.length > 0 });
+        }
+    });
+});
+
+// Endpoint pour stocker une nouvelle piste
+app.post('/tracks', (req, res) => {
+    const track = req.body;
+    const query = 'INSERT INTO tracks (name, album_id, duration, spotify_popularity, spotify_id, description, image, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())';
+    const values = [
+        track.name,
+        track.album_id,
+        track.duration,
+        track.spotify_popularity,
+        track.spotify_id,
+        track.description,
+        track.image
+    ];
+    db.query(query, values, (error, results) => {
+        if (error) {
+            console.error('Error storing track:', error);
+            res.status(500).send('Server error');
+        } else {
+            res.status(201).send('Track stored successfully');
+        }
+    });
+});
 
 // Fonction pour vérifier si un utilisateur est banni
 async function checkBan(userId, ip, machineId) {
