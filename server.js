@@ -202,6 +202,7 @@ app.post('/logout', verifyToken, async (req, res) => {
     }
 });
 
+
 // Endpoint pour activer Google Authenticator
 app.post('/enable-2fa', verifyToken, async (req, res) => {
     const secret = speakeasy.generateSecret({ length: 20 });
@@ -1024,12 +1025,19 @@ function verifyToken(req, res, next) {
     if (!token) return res.status(403).send('No token provided');
 
     jwt.verify(token, secretKey, async (err, decoded) => {
-        if (err) return res.status(500).send('Failed to authenticate token');
+        if (err) {
+            if (err.name === 'TokenExpiredError') {
+                return res.status(401).send('Token expired');
+            } else {
+                return res.status(500).send('Failed to authenticate token');
+            }
+        }
         req.userId = decoded.id;
         req.userRank = decoded.rank;
         next();
     });
-}
+};
+
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
