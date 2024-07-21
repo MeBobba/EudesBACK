@@ -83,6 +83,33 @@ async function checkBan(userId, ip, machineId) {
     }
 }
 
+app.get('/staff', verifyToken, async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    try {
+        const [ranks] = await db.promise().query(
+            'SELECT * FROM permissions WHERE level >= 5 ORDER BY level DESC LIMIT ? OFFSET ?',
+            [limit, offset]
+        );
+
+        const staffSections = await Promise.all(
+            ranks.map(async (rank) => {
+                const [users] = await db.promise().query(
+                    'SELECT * FROM users WHERE rank = ?', [rank.level]
+                );
+                return { rank_name: rank.rank_name, users };
+            })
+        );
+
+        res.status(200).send(staffSections);
+    } catch (err) {
+        console.error('Error fetching staff data:', err);
+        res.status(500).send('Server error');
+    }
+});
+
 // Ajout de la route /check-ban
 app.get('/check-ban', verifyToken, async (req, res) => {
     const ip = getClientIp(req);
@@ -164,10 +191,6 @@ app.post('/login', async (req, res) => {
             return res.status(401).send('Invalid password');
         }
 
-        if (user.is_logged_in) {
-            return res.status(403).send('User already logged in');
-        }
-
         // Vérifier le token 2FA si activé
         if (user.is_2fa_enabled) {
             const verified = speakeasy.totp.verify({
@@ -183,7 +206,7 @@ app.post('/login', async (req, res) => {
 
         const token = jwt.sign({ id: user.id, rank: user.rank }, secretKey, { expiresIn: '24h' });
 
-        await db.promise().query('UPDATE users SET is_logged_in = 1, machine_id = ? WHERE id = ?', [machine_id, user.id]);
+        await db.promise().query('UPDATE users SET machine_id = ? WHERE id = ?', [machine_id, user.id]);
         res.status(200).send({ auth: true, token });
     } catch (err) {
         console.error('Error logging in user:', err);
@@ -194,13 +217,13 @@ app.post('/login', async (req, res) => {
 // Déconnexion
 app.post('/logout', verifyToken, async (req, res) => {
     try {
-        await db.promise().query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [req.userId]);
         res.status(200).send('User logged out successfully');
     } catch (err) {
         console.error('Error logging out user:', err);
         res.status(500).send('Server error');
     }
 });
+
 
 
 // Endpoint pour activer Google Authenticator
@@ -1027,6 +1050,12 @@ function verifyToken(req, res, next) {
     jwt.verify(token, secretKey, async (err, decoded) => {
         if (err) {
             if (err.name === 'TokenExpiredError') {
+                // Mettre à jour is_logged_in à 0 lorsque le token est expiré
+                try {
+                    await db.promise().query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [decoded.id]);
+                } catch (updateErr) {
+                    console.error('Error updating is_logged_in on token expiration:', updateErr);
+                }
                 return res.status(401).send('Token expired');
             } else {
                 return res.status(500).send('Failed to authenticate token');
