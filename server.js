@@ -20,7 +20,6 @@ app.get('/check-session', verifyToken, (req, res) => {
     res.status(200).send({ valid: true });
 });
 
-
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-access-token');
@@ -34,20 +33,20 @@ function getClientIp(req) {
 }
 
 // Endpoint pour vérifier l'existence d'une piste
-app.get('/tracks/:spotifyId', (req, res) => {
+app.get('/tracks/:spotifyId', async (req, res) => {
     const spotifyId = req.params.spotifyId;
-    db.query('SELECT * FROM tracks WHERE spotify_id = ?', [spotifyId], (error, results) => {
-        if (error) {
-            console.error('Error checking track existence:', error);
-            res.status(500).send('Server error');
-        } else {
-            res.send({ exists: results.length > 0 });
-        }
-    });
+    try {
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT * FROM tracks WHERE spotify_id = ?', [spotifyId]);
+        res.send({ exists: results.length > 0 });
+    } catch (error) {
+        console.error('Error checking track existence:', error);
+        res.status(500).send('Server error');
+    }
 });
 
 // Endpoint pour stocker une nouvelle piste
-app.post('/tracks', (req, res) => {
+app.post('/tracks', async (req, res) => {
     const track = req.body;
     const query = 'INSERT INTO tracks (name, album_id, duration, spotify_popularity, spotify_id, description, image, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())';
     const values = [
@@ -59,20 +58,21 @@ app.post('/tracks', (req, res) => {
         track.description,
         track.image
     ];
-    db.query(query, values, (error, results) => {
-        if (error) {
-            console.error('Error storing track:', error);
-            res.status(500).send('Server error');
-        } else {
-            res.status(201).send('Track stored successfully');
-        }
-    });
+    try {
+        const connection = await db.promise();
+        await connection.query(query, values);
+        res.status(201).send('Track stored successfully');
+    } catch (error) {
+        console.error('Error storing track:', error);
+        res.status(500).send('Server error');
+    }
 });
 
 // Fonction pour vérifier si un utilisateur est banni
 async function checkBan(userId, ip, machineId) {
     try {
-        const [results] = await db.promise().query(
+        const connection = await db.promise();
+        const [results] = await connection.query(
             'SELECT * FROM bans WHERE (user_id = ? OR ip = ? OR machine_id = ?) AND (ban_expire = 0 OR ban_expire > UNIX_TIMESTAMP())',
             [userId, ip, machineId]
         );
@@ -83,20 +83,21 @@ async function checkBan(userId, ip, machineId) {
     }
 }
 
+// Endpoint pour récupérer les informations du staff
 app.get('/staff', verifyToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
-
     try {
-        const [ranks] = await db.promise().query(
+        const connection = await db.promise();
+        const [ranks] = await connection.query(
             'SELECT * FROM permissions WHERE level >= 5 ORDER BY level DESC LIMIT ? OFFSET ?',
             [limit, offset]
         );
 
         const staffSections = await Promise.all(
             ranks.map(async (rank) => {
-                const [users] = await db.promise().query(
+                const [users] = await connection.query(
                     'SELECT * FROM users WHERE rank = ?', [rank.level]
                 );
                 return { rank_name: rank.rank_name, users };
@@ -114,7 +115,6 @@ app.get('/staff', verifyToken, async (req, res) => {
 app.get('/check-ban', verifyToken, async (req, res) => {
     const ip = getClientIp(req);
     const machineId = req.headers['machine-id'];
-
     try {
         const isBanned = await checkBan(req.userId, ip, machineId);
         if (isBanned) {
@@ -130,9 +130,9 @@ app.get('/check-ban', verifyToken, async (req, res) => {
 // Ajout de la route /check-2fa
 app.get('/check-2fa', async (req, res) => {
     const { username } = req.query;
-
     try {
-        const [results] = await db.promise().query('SELECT is_2fa_enabled FROM users WHERE username = ?', [username]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT is_2fa_enabled FROM users WHERE username = ?', [username]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -155,7 +155,8 @@ app.post('/register', async (req, res) => {
     const ip = getClientIp(req);
 
     try {
-        const [result] = await db.promise().query(
+        const connection = await db.promise();
+        const [result] = await connection.query(
             'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current, machine_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [username, hashedPassword, mail, account_created, last_login, motto, ip, ip, machine_id]
         );
@@ -173,7 +174,8 @@ app.post('/login', async (req, res) => {
     const ip = getClientIp(req);
 
     try {
-        const [results] = await db.promise().query('SELECT * FROM users WHERE username = ?', [username]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT * FROM users WHERE username = ?', [username]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -206,7 +208,7 @@ app.post('/login', async (req, res) => {
 
         const token = jwt.sign({ id: user.id, rank: user.rank }, secretKey, { expiresIn: '24h' });
 
-        await db.promise().query('UPDATE users SET machine_id = ? WHERE id = ?', [machine_id, user.id]);
+        await connection.query('UPDATE users SET machine_id = ? WHERE id = ?', [machine_id, user.id]);
         res.status(200).send({ auth: true, token });
     } catch (err) {
         console.error('Error logging in user:', err);
@@ -224,8 +226,6 @@ app.post('/logout', verifyToken, async (req, res) => {
     }
 });
 
-
-
 // Endpoint pour activer Google Authenticator
 app.post('/enable-2fa', verifyToken, async (req, res) => {
     const secret = speakeasy.generateSecret({ length: 20 });
@@ -235,9 +235,9 @@ app.post('/enable-2fa', verifyToken, async (req, res) => {
         issuer: 'Eudes'
     });
 
-    // Stocker le secret dans la base de données de l'utilisateur
     try {
-        await db.promise().query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret.base32, req.userId]);
+        const connection = await db.promise();
+        await connection.query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret.base32, req.userId]);
         qrcode.toDataURL(url, (err, data_url) => {
             res.status(200).send({ secret: secret.base32, dataURL: data_url });
         });
@@ -251,7 +251,8 @@ app.post('/enable-2fa', verifyToken, async (req, res) => {
 app.post('/verify-2fa', verifyToken, async (req, res) => {
     const { token } = req.body;
     try {
-        const [results] = await db.promise().query('SELECT google_auth_secret FROM users WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT google_auth_secret FROM users WHERE id = ?', [req.userId]);
         const user = results[0];
         const verified = speakeasy.totp.verify({
             secret: user.google_auth_secret,
@@ -260,7 +261,7 @@ app.post('/verify-2fa', verifyToken, async (req, res) => {
             window: 1 // Allow some time drift
         });
         if (verified) {
-            await db.promise().query('UPDATE users SET is_2fa_enabled = 1 WHERE id = ?', [req.userId]);
+            await connection.query('UPDATE users SET is_2fa_enabled = 1 WHERE id = ?', [req.userId]);
             res.status(200).send('2FA enabled successfully');
         } else {
             res.status(400).send('Invalid token');
@@ -274,7 +275,8 @@ app.post('/verify-2fa', verifyToken, async (req, res) => {
 // Endpoint pour désactiver Google Authenticator
 app.post('/disable-2fa', verifyToken, async (req, res) => {
     try {
-        await db.promise().query('UPDATE users SET is_2fa_enabled = 0, google_auth_secret = NULL WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        await connection.query('UPDATE users SET is_2fa_enabled = 0, google_auth_secret = NULL WHERE id = ?', [req.userId]);
         res.status(200).send('2FA disabled successfully');
     } catch (err) {
         console.error('Error disabling 2FA:', err);
@@ -285,7 +287,8 @@ app.post('/disable-2fa', verifyToken, async (req, res) => {
 // Tableau de bord utilisateur
 app.get('/dashboard', verifyToken, async (req, res) => {
     try {
-        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT * FROM users WHERE id = ?', [req.userId]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -300,7 +303,8 @@ app.get('/dashboard', verifyToken, async (req, res) => {
 app.post('/check-username', async (req, res) => {
     const { username } = req.body;
     try {
-        const [results] = await db.promise().query('SELECT username FROM users WHERE username = ?', [username]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT username FROM users WHERE username = ?', [username]);
         res.status(200).send({ exists: results.length > 0 });
     } catch (err) {
         console.error('Error checking username:', err);
@@ -312,7 +316,8 @@ app.post('/check-username', async (req, res) => {
 app.post('/check-email', async (req, res) => {
     const { email } = req.body;
     try {
-        const [results] = await db.promise().query('SELECT mail FROM users WHERE mail = ?', [email]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT mail FROM users WHERE mail = ?', [email]);
         res.status(200).send({ exists: results.length > 0 });
     } catch (err) {
         console.error('Error checking email:', err);
@@ -339,7 +344,8 @@ app.get('/anti-robot-question', (req, res) => {
 // Endpoint pour télécharger les données de l'utilisateur
 app.get('/download-data', verifyToken, async (req, res) => {
     try {
-        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT * FROM users WHERE id = ?', [req.userId]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -353,7 +359,8 @@ app.get('/download-data', verifyToken, async (req, res) => {
 // Endpoint pour supprimer le compte de l'utilisateur
 app.delete('/delete-account', verifyToken, async (req, res) => {
     try {
-        await db.promise().query('DELETE FROM users WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        await connection.query('DELETE FROM users WHERE id = ?', [req.userId]);
         res.status(200).send('User account deleted successfully');
     } catch (err) {
         console.error('Error deleting user account:', err);
@@ -365,7 +372,8 @@ app.delete('/delete-account', verifyToken, async (req, res) => {
 app.put('/update-account', verifyToken, async (req, res) => {
     const { username, real_name, mail, motto, look, gender } = req.body;
     try {
-        await db.promise().query('UPDATE users SET username = ?, real_name = ?, mail = ?, motto = ?, look = ?, gender = ? WHERE id = ?',
+        const connection = await db.promise();
+        await connection.query('UPDATE users SET username = ?, real_name = ?, mail = ?, motto = ?, look = ?, gender = ? WHERE id = ?',
             [username, real_name, mail, motto, look, gender, req.userId]);
         res.status(200).send('User account updated successfully');
     } catch (err) {
@@ -379,22 +387,31 @@ app.post('/posts', verifyToken, async (req, res) => {
     const { content, image, video, visibility } = req.body;
 
     try {
-        const [[user]] = await db.promise().query('SELECT rank, last_post_time FROM users WHERE id = ?', [req.userId]);
-
+        const connection = await db.promise();
+        const [[user]] = await connection.query('SELECT rank, last_post_time FROM users WHERE id = ?', [req.userId]);
         const currentTime = Math.floor(Date.now() / 1000);
 
+        // Check for flood protection
         if (user.rank < 5 && user.last_post_time && (currentTime - user.last_post_time < 15)) {
             return res.status(429).send('You must wait 15 seconds before posting again.');
         }
 
-        const [result] = await db.promise().query(
+        // Apply wordfilter
+        const [wordFilters] = await connection.query('SELECT * FROM wordfilter');
+        let filteredContent = content;
+        wordFilters.forEach(filter => {
+            const regex = new RegExp(`\\b${filter.key}\\b`, 'gi');
+            filteredContent = filteredContent.replace(regex, filter.replacement);
+        });
+
+        const [result] = await connection.query(
             'INSERT INTO posts (user_id, content, image, video, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [req.userId, content, image, video, visibility, new Date()]
+            [req.userId, filteredContent, image, video, visibility, new Date()]
         );
 
-        await db.promise().query('UPDATE users SET last_post_time = ? WHERE id = ?', [currentTime, req.userId]);
+        await connection.query('UPDATE users SET last_post_time = ? WHERE id = ?', [currentTime, req.userId]);
 
-        const [newPost] = await db.promise().query(
+        const [newPost] = await connection.query(
             `SELECT posts.*, users.username, users.look
             FROM posts
             JOIN users ON posts.user_id = users.id
@@ -409,11 +426,11 @@ app.post('/posts', verifyToken, async (req, res) => {
     }
 });
 
-
 // Endpoint pour récupérer les posts de l'utilisateur
 app.get('/posts', verifyToken, async (req, res) => {
     try {
-        const [posts] = await db.promise().query(
+        const connection = await db.promise();
+        const [posts] = await connection.query(
             `SELECT posts.*, users.username, users.look,
             COALESCE(likesCount.likesCount, 0) as likesCount,
             COALESCE(commentsCount.commentsCount, 0) as commentsCount,
@@ -450,7 +467,7 @@ app.get('/posts', verifyToken, async (req, res) => {
         );
 
         for (let post of posts) {
-            const [comments] = await db.promise().query(
+            const [comments] = await connection.query(
                 `SELECT comments.*, users.username, users.look
                 FROM comments
                 JOIN users ON comments.user_id = users.id
@@ -473,7 +490,8 @@ app.get('/public-posts', verifyToken, async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
     try {
-        const [posts] = await db.promise().query(
+        const connection = await db.promise();
+        const [posts] = await connection.query(
             `SELECT DISTINCT posts.*, users.username, users.look,
             COALESCE(likesCount.likesCount, 0) as likesCount,
             COALESCE(commentsCount.commentsCount, 0) as commentsCount,
@@ -503,7 +521,7 @@ app.get('/public-posts', verifyToken, async (req, res) => {
         );
 
         for (let post of posts) {
-            const [comments] = await db.promise().query(
+            const [comments] = await connection.query(
                 `SELECT comments.*, users.username, users.look
                 FROM comments
                 JOIN users ON comments.user_id = users.id
@@ -523,9 +541,10 @@ app.get('/public-posts', verifyToken, async (req, res) => {
 
 async function deletePostWithComments(postId) {
     try {
-        await db.promise().query('DELETE FROM comments WHERE post_id = ?', [postId]);
-        await db.promise().query('DELETE FROM likes WHERE post_id = ?', [postId]);
-        await db.promise().query('DELETE FROM posts WHERE id = ?', [postId]);
+        const connection = await db.promise();
+        await connection.query('DELETE FROM comments WHERE post_id = ?', [postId]);
+        await connection.query('DELETE FROM likes WHERE post_id = ?', [postId]);
+        await connection.query('DELETE FROM posts WHERE id = ?', [postId]);
     } catch (err) {
         throw err;
     }
@@ -535,10 +554,11 @@ async function deletePostWithComments(postId) {
 app.delete('/posts/:postId', verifyToken, async (req, res) => {
     const { postId } = req.params;
     try {
-        const [[user]] = await db.promise().query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        const [[user]] = await connection.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
         const userRank = user.rank;
 
-        const [[post]] = await db.promise().query('SELECT user_id FROM posts WHERE id = ?', [postId]);
+        const [[post]] = await connection.query('SELECT user_id FROM posts WHERE id = ?', [postId]);
         if (!post) {
             return res.status(404).send('Post not found');
         }
@@ -553,31 +573,21 @@ app.delete('/posts/:postId', verifyToken, async (req, res) => {
 
         res.status(200).send('Post deleted successfully');
     } catch (err) {
-        console.error('Error deleting post:', err); // Log the error
+        console.error('Error deleting post:', err);
         res.status(500).send('Server error');
     }
 });
-
-async function deletePostWithComments(postId) {
-    try {
-        await db.promise().query('DELETE FROM comments WHERE post_id = ?', [postId]);
-        await db.promise().query('DELETE FROM likes WHERE post_id = ?', [postId]);
-        await db.promise().query('DELETE FROM posts WHERE id = ?', [postId]);
-    } catch (err) {
-        console.error('Error in deletePostWithComments:', err); // Log the error
-        throw err;
-    }
-}
 
 // Endpoint pour commenter un post
 app.post('/comments', verifyToken, async (req, res) => {
     const { postId, content } = req.body;
     try {
-        const [result] = await db.promise().query(
+        const connection = await db.promise();
+        const [result] = await connection.query(
             'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
             [postId, req.userId, content]
         );
-        const [comment] = await db.promise().query(
+        const [comment] = await connection.query(
             'SELECT comments.*, users.username, users.look FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?',
             [result.insertId]
         );
@@ -588,12 +598,12 @@ app.post('/comments', verifyToken, async (req, res) => {
     }
 });
 
-
 // Endpoint pour liker/disliker un post
 app.post('/likes', verifyToken, async (req, res) => {
     const { postId, isLike } = req.body;
     try {
-        const [existingLike] = await db.promise().query(
+        const connection = await db.promise();
+        const [existingLike] = await connection.query(
             'SELECT * FROM likes WHERE post_id = ? AND user_id = ?',
             [postId, req.userId]
         );
@@ -601,30 +611,30 @@ app.post('/likes', verifyToken, async (req, res) => {
         if (existingLike.length > 0) {
             if (existingLike[0].is_like === isLike) {
                 // If the same like status is being sent, remove the like
-                await db.promise().query(
+                await connection.query(
                     'DELETE FROM likes WHERE id = ?',
                     [existingLike[0].id]
                 );
             } else {
                 // Otherwise, update the like status
-                await db.promise().query(
+                await connection.query(
                     'UPDATE likes SET is_like = ? WHERE id = ?',
                     [isLike, existingLike[0].id]
                 );
             }
         } else {
-            await db.promise().query(
+            await connection.query(
                 'INSERT INTO likes (post_id, user_id, is_like) VALUES (?, ?, ?)',
                 [postId, req.userId, isLike]
             );
         }
 
-        const [[likeStatus]] = await db.promise().query(
+        const [[likeStatus]] = await connection.query(
             'SELECT is_like FROM likes WHERE post_id = ? AND user_id = ?',
             [postId, req.userId]
         );
 
-        const [[likesCount]] = await db.promise().query(
+        const [[likesCount]] = await connection.query(
             'SELECT COUNT(*) AS likesCount FROM likes WHERE post_id = ? AND is_like = true',
             [postId]
         );
@@ -636,11 +646,11 @@ app.post('/likes', verifyToken, async (req, res) => {
     }
 });
 
-
 // Endpoint pour récupérer les photos de l'utilisateur
 app.get('/user-photos', verifyToken, async (req, res) => {
     try {
-        const [photos] = await db.promise().query(
+        const connection = await db.promise();
+        const [photos] = await connection.query(
             'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
             [req.userId]
         );
@@ -654,7 +664,8 @@ app.get('/user-photos', verifyToken, async (req, res) => {
 // Route pour récupérer le profil de l'utilisateur courant
 app.get('/profile/me', verifyToken, async (req, res) => {
     try {
-        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT * FROM users WHERE id = ?', [req.userId]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -668,7 +679,8 @@ app.get('/profile/me', verifyToken, async (req, res) => {
 // Endpoint pour récupérer les jeux
 app.get('/games', async (req, res) => {
     try {
-        const [games] = await db.promise().query('SELECT * FROM games');
+        const connection = await db.promise();
+        const [games] = await connection.query('SELECT * FROM games');
         res.status(200).send(games);
     } catch (error) {
         console.error('Error fetching games:', error);
@@ -679,7 +691,8 @@ app.get('/games', async (req, res) => {
 // Endpoint pour récupérer les jeux par ID
 app.get('/games/:id', async (req, res) => {
     try {
-        const [games] = await db.promise().query('SELECT * FROM games WHERE id = ?', [req.params.id]);
+        const connection = await db.promise();
+        const [games] = await connection.query('SELECT * FROM games WHERE id = ?', [req.params.id]);
         if (games.length === 0) {
             return res.status(404).send('Game not found');
         }
@@ -690,13 +703,12 @@ app.get('/games/:id', async (req, res) => {
     }
 });
 
-
-
 // Route pour récupérer le profil d'un utilisateur par ID
 app.get('/profile/:userId', verifyToken, async (req, res) => {
     const { userId } = req.params;
     try {
-        const [users] = await db.promise().query('SELECT * FROM users WHERE id = ?', [userId]);
+        const connection = await db.promise();
+        const [users] = await connection.query('SELECT * FROM users WHERE id = ?', [userId]);
         if (users.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -711,7 +723,8 @@ app.get('/profile/:userId', verifyToken, async (req, res) => {
 app.get('/search-users', verifyToken, async (req, res) => {
     const { query } = req.query;
     try {
-        const [results] = await db.promise().query('SELECT id, username FROM users WHERE username LIKE ?', [`%${query}%`]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT id, username FROM users WHERE username LIKE ?', [`%${query}%`]);
         res.status(200).send(results);
     } catch (err) {
         console.error('Error searching users:', err);
@@ -723,7 +736,8 @@ app.get('/search-users', verifyToken, async (req, res) => {
 app.get('/dashboard/:userId', verifyToken, async (req, res) => {
     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
     try {
-        const [results] = await db.promise().query('SELECT * FROM users WHERE id = ?', [userId]);
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT * FROM users WHERE id = ?', [userId]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -738,7 +752,8 @@ app.get('/dashboard/:userId', verifyToken, async (req, res) => {
 app.get('/user-photos/:userId', verifyToken, async (req, res) => {
     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
     try {
-        const [photos] = await db.promise().query(
+        const connection = await db.promise();
+        const [photos] = await connection.query(
             'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
             [userId]
         );
@@ -753,7 +768,8 @@ app.get('/user-photos/:userId', verifyToken, async (req, res) => {
 app.get('/posts/:userId', verifyToken, async (req, res) => {
     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
     try {
-        const [posts] = await db.promise().query(
+        const connection = await db.promise();
+        const [posts] = await connection.query(
             `SELECT posts.*, users.username, users.look,
             COALESCE(likesCount.likesCount, 0) as likesCount,
             COALESCE(commentsCount.commentsCount, 0) as commentsCount,
@@ -782,7 +798,7 @@ app.get('/posts/:userId', verifyToken, async (req, res) => {
         );
 
         for (let post of posts) {
-            const [comments] = await db.promise().query(
+            const [comments] = await connection.query(
                 `SELECT comments.*, users.username, users.look
                 FROM comments
                 JOIN users ON comments.user_id = users.id
@@ -803,7 +819,8 @@ app.get('/posts/:userId', verifyToken, async (req, res) => {
 // Endpoint pour récupérer la liste des articles
 app.get('/articles', async (req, res) => {
     try {
-        const [articles] = await db.promise().query('SELECT * FROM articles ORDER BY date DESC');
+        const connection = await db.promise();
+        const [articles] = await connection.query('SELECT * FROM articles ORDER BY date DESC');
         res.status(200).send(articles);
     } catch (error) {
         console.error('Error fetching articles:', error);
@@ -815,9 +832,9 @@ app.get('/articles', async (req, res) => {
 app.get('/articles/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.userId; // Assurez-vous que verifyToken est utilisé pour définir req.userId
-
     try {
-        const [articles] = await db.promise().query('SELECT * FROM articles WHERE id = ?', [id]);
+        const connection = await db.promise();
+        const [articles] = await connection.query('SELECT * FROM articles WHERE id = ?', [id]);
         if (articles.length === 0) {
             return res.status(404).send('Article not found');
         }
@@ -825,25 +842,25 @@ app.get('/articles/:id', verifyToken, async (req, res) => {
         const article = articles[0];
 
         // Récupérer le nombre de likes
-        const [[likesCount]] = await db.promise().query(
+        const [[likesCount]] = await connection.query(
             'SELECT COUNT(*) AS likesCount FROM article_likes WHERE article_id = ? AND is_like = true',
             [id]
         );
 
         // Récupérer le nombre de commentaires
-        const [[commentsCount]] = await db.promise().query(
+        const [[commentsCount]] = await connection.query(
             'SELECT COUNT(*) AS commentsCount FROM article_comments WHERE article_id = ?',
             [id]
         );
 
         // Vérifier si l'utilisateur a liké l'article
-        const [[userLike]] = await db.promise().query(
+        const [[userLike]] = await connection.query(
             'SELECT is_like FROM article_likes WHERE article_id = ? AND user_id = ?',
             [id, userId]
         );
 
         // Récupérer les commentaires
-        const [comments] = await db.promise().query(
+        const [comments] = await connection.query(
             `SELECT article_comments.*, users.username, users.look 
             FROM article_comments 
             JOIN users ON article_comments.user_id = users.id 
@@ -869,29 +886,30 @@ app.post('/articles/:articleId/likes', verifyToken, async (req, res) => {
     const { articleId } = req.params;
     const { isLike } = req.body;
     try {
-        const [existingLike] = await db.promise().query(
+        const connection = await db.promise();
+        const [existingLike] = await connection.query(
             'SELECT * FROM article_likes WHERE article_id = ? AND user_id = ?',
             [articleId, req.userId]
         );
 
         if (existingLike.length > 0) {
-            await db.promise().query(
+            await connection.query(
                 'UPDATE article_likes SET is_like = ? WHERE id = ?',
                 [isLike, existingLike[0].id]
             );
         } else {
-            await db.promise().query(
+            await connection.query(
                 'INSERT INTO article_likes (article_id, user_id, is_like) VALUES (?, ?, ?)',
                 [articleId, req.userId, isLike]
             );
         }
 
-        const [[likeStatus]] = await db.promise().query(
+        const [[likeStatus]] = await connection.query(
             'SELECT is_like FROM article_likes WHERE article_id = ? AND user_id = ?',
             [articleId, req.userId]
         );
 
-        const [[likesCount]] = await db.promise().query(
+        const [[likesCount]] = await connection.query(
             'SELECT COUNT(*) AS likesCount FROM article_likes WHERE article_id = ? AND is_like = true',
             [articleId]
         );
@@ -909,7 +927,8 @@ app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
     const { content } = req.body;
 
     try {
-        const [[user]] = await db.promise().query('SELECT last_comment_time FROM users WHERE id = ?', [req.userId]);
+        const connection = await db.promise();
+        const [[user]] = await connection.query('SELECT last_comment_time FROM users WHERE id = ?', [req.userId]);
 
         const currentTime = Math.floor(Date.now() / 1000);
 
@@ -917,14 +936,14 @@ app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
             return res.status(429).send('You must wait 15 seconds before commenting again.');
         }
 
-        const [result] = await db.promise().query(
+        const [result] = await connection.query(
             'INSERT INTO article_comments (article_id, user_id, content) VALUES (?, ?, ?)',
             [articleId, req.userId, content]
         );
 
-        await db.promise().query('UPDATE users SET last_comment_time = ? WHERE id = ?', [currentTime, req.userId]);
+        await connection.query('UPDATE users SET last_comment_time = ? WHERE id = ?', [currentTime, req.userId]);
 
-        const [comment] = await db.promise().query(
+        const [comment] = await connection.query(
             'SELECT article_comments.*, users.username, users.look FROM article_comments JOIN users ON article_comments.user_id = users.id WHERE article_comments.id = ?',
             [result.insertId]
         );
@@ -936,25 +955,26 @@ app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
     }
 });
 
-
-app.delete('/comments/:commentId', verifyToken, async (req, res) => {
+// Suppression des commentaires d'articles
+app.delete('/article-comments/:commentId', verifyToken, async (req, res) => {
     try {
         console.log('User ID:', req.userId);
         console.log('Comment ID:', req.params.commentId);
 
-        const [[comment]] = await db.promise().query('SELECT user_id FROM comments WHERE id = ?', [req.params.commentId]);
+        const connection = await db.promise();
+        const [[comment]] = await connection.query('SELECT user_id FROM article_comments WHERE id = ?', [req.params.commentId]);
         if (!comment) {
             return res.status(404).send('Comment not found');
         }
 
-        const [[user]] = await db.promise().query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+        const [[user]] = await connection.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
         console.log('User Rank:', user.rank);
 
         if (user.rank < 5 && comment.user_id !== req.userId) {
             return res.status(403).send('Not authorized to delete this comment');
         }
 
-        await db.promise().query('DELETE FROM comments WHERE id = ?', [req.params.commentId]);
+        await connection.query('DELETE FROM article_comments WHERE id = ?', [req.params.commentId]);
         res.status(200).send('Comment deleted successfully');
     } catch (err) {
         console.error('Error deleting comment:', err);
@@ -962,17 +982,15 @@ app.delete('/comments/:commentId', verifyToken, async (req, res) => {
     }
 });
 
-
-
-
-
+// Endpoint for creating a new article
 app.post('/articles', verifyToken, async (req, res) => {
     const { title, summary, content, image } = req.body;
     if (req.userRank < 5) {
         return res.status(403).send('Not authorized to create articles');
     }
     try {
-        const [result] = await db.promise().query(
+        const connection = await db.promise();
+        const [result] = await connection.query(
             'INSERT INTO articles (title, summary, content, image) VALUES (?, ?, ?, ?)',
             [title, summary, content, image]
         );
@@ -983,6 +1001,7 @@ app.post('/articles', verifyToken, async (req, res) => {
     }
 });
 
+// Endpoint for updating an article
 app.put('/articles/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
     const { title, summary, content, image } = req.body;
@@ -990,7 +1009,8 @@ app.put('/articles/:id', verifyToken, async (req, res) => {
         return res.status(403).send('Not authorized to edit articles');
     }
     try {
-        await db.promise().query(
+        const connection = await db.promise();
+        await connection.query(
             'UPDATE articles SET title = ?, summary = ?, content = ?, image = ? WHERE id = ?',
             [title, summary, content, image, id]
         );
@@ -1001,46 +1021,21 @@ app.put('/articles/:id', verifyToken, async (req, res) => {
     }
 });
 
+// Endpoint for deleting an article
 app.delete('/articles/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
     if (req.userRank < 5) {
         return res.status(403).send('Not authorized to delete articles');
     }
     try {
-        await db.promise().query('DELETE FROM articles WHERE id = ?', [id]);
+        const connection = await db.promise();
+        await connection.query('DELETE FROM articles WHERE id = ?', [id]);
         res.status(200).send('Article deleted successfully');
     } catch (err) {
         console.error('Error deleting article:', err);
         res.status(500).send('Server error');
     }
 });
-
-// Suppression des commentaires d'articles
-app.delete('/article-comments/:commentId', verifyToken, async (req, res) => {
-    try {
-        console.log('User ID:', req.userId);
-        console.log('Comment ID:', req.params.commentId);
-
-        const [[comment]] = await db.promise().query('SELECT user_id FROM article_comments WHERE id = ?', [req.params.commentId]);
-        if (!comment) {
-            return res.status(404).send('Comment not found');
-        }
-
-        const [[user]] = await db.promise().query('SELECT rank FROM users WHERE id = ?', [req.userId]);
-        console.log('User Rank:', user.rank);
-
-        if (user.rank < 5 && comment.user_id !== req.userId) {
-            return res.status(403).send('Not authorized to delete this comment');
-        }
-
-        await db.promise().query('DELETE FROM article_comments WHERE id = ?', [req.params.commentId]);
-        res.status(200).send('Comment deleted successfully');
-    } catch (err) {
-        console.error('Error deleting comment:', err);
-        res.status(500).send('Server error');
-    }
-});
-
 
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
@@ -1052,7 +1047,8 @@ function verifyToken(req, res, next) {
             if (err.name === 'TokenExpiredError') {
                 // Mettre à jour is_logged_in à 0 lorsque le token est expiré
                 try {
-                    await db.promise().query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [decoded.id]);
+                    const connection = await db.promise();
+                    await connection.query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [decoded.id]);
                 } catch (updateErr) {
                     console.error('Error updating is_logged_in on token expiration:', updateErr);
                 }
@@ -1065,8 +1061,7 @@ function verifyToken(req, res, next) {
         req.userRank = decoded.rank;
         next();
     });
-};
-
+}
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
