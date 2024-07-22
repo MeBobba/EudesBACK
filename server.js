@@ -83,45 +83,27 @@ async function checkBan(userId, ip, machineId) {
     }
 }
 
-// Endpoint pour récupérer les stories
-app.get('/stories/:userId', verifyToken, async (req, res) => {
-    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+// Endpoint pour les filtres de mots
+app.get('/wordfilter', verifyToken, async (req, res) => {
     try {
         const connection = await db.promise();
-        const [stories] = await connection.query(
-            `SELECT stories.*, users.username, users.look AS userAvatar
-         FROM stories
-         JOIN users ON stories.user_id = users.id
-         WHERE stories.user_id = ? OR stories.visibility = "public"
-         ORDER BY stories.created_at DESC`,
-            [userId]
-        );
-        res.status(200).send(stories);
+        const [filters] = await connection.query('SELECT * FROM wordfilter');
+        res.status(200).send(filters);
     } catch (err) {
-        console.error('Error fetching stories:', err);
+        console.error('Error fetching word filters:', err);
         res.status(500).send('Server error');
     }
 });
 
-// Endpoint pour ajouter une story
-app.post('/stories', verifyToken, async (req, res) => {
-    const { content, image, visibility } = req.body;
+// Endpoint pour les histoires utilisateur (user stories)
+app.get('/stories/:userId', verifyToken, async (req, res) => {
+    const { userId } = req.params;
     try {
         const connection = await db.promise();
-        const [result] = await connection.query(
-            'INSERT INTO stories (user_id, content, image, visibility, created_at) VALUES (?, ?, ?, ?, ?)',
-            [req.userId, content, image, visibility, new Date()]
-        );
-        const [newStory] = await connection.query(
-            `SELECT stories.*, users.username, users.look AS userAvatar
-         FROM stories
-         JOIN users ON stories.user_id = users.id
-         WHERE stories.id = ?`,
-            [result.insertId]
-        );
-        res.status(201).send(newStory[0]);
+        const [stories] = await connection.query('SELECT * FROM stories WHERE user_id = ?', [userId]);
+        res.status(200).send(stories);
     } catch (err) {
-        console.error('Error creating story:', err);
+        console.error('Error fetching stories:', err);
         res.status(500).send('Server error');
     }
 });
@@ -269,6 +251,31 @@ app.post('/logout', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+// Endpoint pour mettre à jour un post
+app.put('/posts/:postId', verifyToken, async (req, res) => {
+    const { postId } = req.params;
+    const { content } = req.body;
+
+    try {
+        const connection = await db.promise();
+        const [result] = await connection.query(
+            'UPDATE posts SET content = ? WHERE id = ?',
+            [content, postId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Post not found');
+        }
+
+        const [updatedPost] = await connection.query('SELECT * FROM posts WHERE id = ?', [postId]);
+        res.status(200).send(updatedPost[0]);
+    } catch (err) {
+        console.error('Error updating post:', err);
+        res.status(500).send('Server error');
+    }
+});
+
 
 // Endpoint pour activer Google Authenticator
 app.post('/enable-2fa', verifyToken, async (req, res) => {
@@ -999,26 +1006,22 @@ app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
     }
 });
 
-// Suppression des commentaires d'articles
+// Endpoint pour supprimer un commentaire d'article
 app.delete('/article-comments/:commentId', verifyToken, async (req, res) => {
+    const { commentId } = req.params;
     try {
-        console.log('User ID:', req.userId);
-        console.log('Comment ID:', req.params.commentId);
-
         const connection = await db.promise();
-        const [[comment]] = await connection.query('SELECT user_id FROM article_comments WHERE id = ?', [req.params.commentId]);
+        const [[comment]] = await connection.query('SELECT user_id FROM article_comments WHERE id = ?', [commentId]);
         if (!comment) {
             return res.status(404).send('Comment not found');
         }
 
         const [[user]] = await connection.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
-        console.log('User Rank:', user.rank);
-
         if (user.rank < 5 && comment.user_id !== req.userId) {
             return res.status(403).send('Not authorized to delete this comment');
         }
 
-        await connection.query('DELETE FROM article_comments WHERE id = ?', [req.params.commentId]);
+        await connection.query('DELETE FROM article_comments WHERE id = ?', [commentId]);
         res.status(200).send('Comment deleted successfully');
     } catch (err) {
         console.error('Error deleting comment:', err);
