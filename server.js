@@ -83,6 +83,50 @@ async function checkBan(userId, ip, machineId) {
     }
 }
 
+// Endpoint pour récupérer les stories
+app.get('/stories/:userId', verifyToken, async (req, res) => {
+    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+    try {
+        const connection = await db.promise();
+        const [stories] = await connection.query(
+            `SELECT stories.*, users.username, users.look AS userAvatar
+         FROM stories
+         JOIN users ON stories.user_id = users.id
+         WHERE stories.user_id = ? OR stories.visibility = "public"
+         ORDER BY stories.created_at DESC`,
+            [userId]
+        );
+        res.status(200).send(stories);
+    } catch (err) {
+        console.error('Error fetching stories:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour ajouter une story
+app.post('/stories', verifyToken, async (req, res) => {
+    const { content, image, visibility } = req.body;
+    try {
+        const connection = await db.promise();
+        const [result] = await connection.query(
+            'INSERT INTO stories (user_id, content, image, visibility, created_at) VALUES (?, ?, ?, ?, ?)',
+            [req.userId, content, image, visibility, new Date()]
+        );
+        const [newStory] = await connection.query(
+            `SELECT stories.*, users.username, users.look AS userAvatar
+         FROM stories
+         JOIN users ON stories.user_id = users.id
+         WHERE stories.id = ?`,
+            [result.insertId]
+        );
+        res.status(201).send(newStory[0]);
+    } catch (err) {
+        console.error('Error creating story:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+
 // Endpoint pour récupérer les informations du staff
 app.get('/staff', verifyToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
