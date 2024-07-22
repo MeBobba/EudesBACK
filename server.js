@@ -108,6 +108,80 @@ app.get('/stories/:userId', verifyToken, async (req, res) => {
     }
 });
 
+// Ajoutez cette fonction pour tirer les numéros de loterie et déterminer les gains
+function drawLotteryNumbers() {
+    const numbers = Array.from({ length: 49 }, (_, i) => i + 1);
+    const drawnNumbers = [];
+    for (let i = 0; i < 6; i++) {
+        const index = Math.floor(Math.random() * numbers.length);
+        drawnNumbers.push(numbers.splice(index, 1)[0]);
+    }
+    return drawnNumbers;
+}
+
+function checkWin(selectedNumbers, drawnNumbers) {
+    const matches = selectedNumbers.filter(number => drawnNumbers.includes(number)).length;
+    if (matches === 6) {
+        return { amount: 5000000, type: 'Crédits' };
+    } else if (matches === 5) {
+        return { amount: 5000000, type: 'Pixels' };
+    } else if (matches === 4) {
+        return { amount: 150, type: 'Points' };
+    }
+    return null;
+}
+
+app.post('/lottery', verifyToken, async (req, res) => {
+    const { selectedNumbers } = req.body;
+    if (!Array.isArray(selectedNumbers) || selectedNumbers.length !== 6) {
+        return res.status(400).send('Invalid input');
+    }
+
+    try {
+        const connection = await db.promise();
+        const [user] = await connection.query('SELECT points FROM users WHERE id = ?', [req.userId]);
+        if (user[0].points < 150) {
+            return res.status(400).send({ success: false, message: 'You do not have enough points to play.' });
+        }
+
+        const drawnNumbers = drawLotteryNumbers();
+        const reward = checkWin(selectedNumbers, drawnNumbers);
+
+        // Deduct 150 points from the user
+        await connection.query('UPDATE users SET points = points - 150 WHERE id = ?', [req.userId]);
+
+        // If there's a reward, add it to the user's account
+        if (reward) {
+            if (reward.type === 'Crédits') {
+                await connection.query('UPDATE users SET credits = credits + ? WHERE id = ?', [reward.amount, req.userId]);
+            } else if (reward.type === 'Pixels') {
+                await connection.query('UPDATE users SET pixels = pixels + ? WHERE id = ?', [reward.amount, req.userId]);
+            } else if (reward.type === 'Points') {
+                await connection.query('UPDATE users SET points = points + ? WHERE id = ?', [reward.amount, req.userId]);
+            }
+        }
+
+        res.status(200).send({ success: true, drawnNumbers, reward });
+    } catch (error) {
+        console.error('Error processing lottery:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+app.get('/user/points', verifyToken, async (req, res) => {
+    try {
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT points FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).send({ points: results[0].points });
+    } catch (error) {
+        console.error('Error fetching user points:', error);
+        res.status(500).send('Server error');
+    }
+});
+
 
 // Endpoint pour récupérer les informations du staff
 app.get('/staff', verifyToken, async (req, res) => {
@@ -1028,6 +1102,30 @@ app.delete('/article-comments/:commentId', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+// Endpoint pour supprimer un commentaire d'article
+app.delete('/comments/:commentId', verifyToken, async (req, res) => {
+    const { commentId } = req.params;
+    try {
+        const connection = await db.promise();
+        const [[comment]] = await connection.query('SELECT user_id FROM comments WHERE id = ?', [commentId]);
+        if (!comment) {
+            return res.status(404).send('Comment not found');
+        }
+
+        const [[user]] = await connection.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+        if (user.rank < 5 && comment.user_id !== req.userId) {
+            return res.status(403).send('Not authorized to delete this comment');
+        }
+
+        await connection.query('DELETE FROM comments WHERE id = ?', [commentId]);
+        res.status(200).send('Comment deleted successfully');
+    } catch (err) {
+        console.error('Error deleting comment:', err);
+        res.status(500).send('Server error');
+    }
+});
+
 
 // Endpoint for creating a new article
 app.post('/articles', verifyToken, async (req, res) => {
