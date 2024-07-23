@@ -12,6 +12,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 const secretKey = process.env.SECRET_KEY || 'yourSecretKey';
 
+const fs = require('fs');
+const path = require('path');
+
 app.use(bodyParser.json());
 app.use(cors());
 
@@ -19,6 +22,101 @@ app.use(cors());
 app.get('/check-session', verifyToken, (req, res) => {
     res.status(200).send({ valid: true });
 });
+
+// Endpoint pour obtenir les informations du portefeuille de l'utilisateur
+app.get('/user/wallet', verifyToken, async (req, res) => {
+    try {
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT points, credits, pixels FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).send(results[0]);
+    } catch (error) {
+        console.error('Error fetching user wallet data:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour générer des crédits pour l'utilisateur
+app.post('/generate-credits', verifyToken, async (req, res) => {
+    try {
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT credits FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+
+        const userCredits = results[0].credits;
+        if (userCredits < 10000) {
+            const newCredits = userCredits + 10000;
+            await connection.query('UPDATE users SET credits = ? WHERE id = ?', [newCredits, req.userId]);
+            res.status(200).send({ generatedCredits: 10000 });
+        } else {
+            res.status(400).send('You have enough credits.');
+        }
+    } catch (error) {
+        console.error('Error generating credits:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+// Servir les fichiers statiques
+app.use('/topstory', express.static(path.join(__dirname, 'topstory')));
+
+// Endpoint pour récupérer les images de la galerie
+app.get('/topstory', verifyToken, async (req, res) => {
+    try {
+        // Assurez-vous que l'utilisateur a le rang nécessaire
+        const connection = await db.promise();
+        const [user] = await connection.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+        if (user.length === 0 || user[0].rank < 5) {
+            return res.status(403).send('Access denied');
+        }
+
+        const imagesDir = path.join(__dirname, 'topstory');
+        fs.readdir(imagesDir, (err, files) => {
+            if (err) {
+                console.error('Error reading images directory:', err);
+                return res.status(500).send('Server error');
+            }
+
+            const images = files.map(file => ({
+                name: file,
+                path: `/topstory/${file}`
+            }));
+
+            res.status(200).send(images);
+        });
+    } catch (error) {
+        console.error('Error fetching topstory images:', error);
+        res.status(500).send('Server error');
+    }
+});
+
+// Endpoint pour générer des pixels pour l'utilisateur
+app.post('/generate-pixels', verifyToken, async (req, res) => {
+    try {
+        const connection = await db.promise();
+        const [results] = await connection.query('SELECT pixels FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+
+        const userPixels = results[0].pixels;
+        if (userPixels < 10000) {
+            const newPixels = userPixels + 10000;
+            await connection.query('UPDATE users SET pixels = ? WHERE id = ?', [newPixels, req.userId]);
+            res.status(200).send({ generatedPixels: 10000 });
+        } else {
+            res.status(400).send('You have enough pixels.');
+        }
+    } catch (error) {
+        console.error('Error generating pixels:', error);
+        res.status(500).send('Server error');
+    }
+});
+
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
