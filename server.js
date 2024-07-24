@@ -7,8 +7,13 @@ const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const db = require('./db');
 require('dotenv').config();
+const http = require('http');
+const socketIo = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
 const port = process.env.PORT || 3000;
 const secretKey = process.env.SECRET_KEY || 'yourSecretKey';
 
@@ -21,6 +26,24 @@ app.use(cors());
 app.use((req, res, next) => {
     req.setTimeout(0); // Désactive le timeout pour chaque requête
     next();
+});
+
+app.get('/maintenance-status', async (req, res) => {
+    try {
+        const connection = await db.promise();
+        const [results] = await connection.query("SELECT `value` FROM `emulator_settings` WHERE `key` = 'website.maintenance'");
+        const isMaintenance = results.length > 0 && results[0].value === '1';
+
+        // Notify clients if maintenance mode is enabled
+        if (isMaintenance) {
+            io.emit('maintenance', true);
+        }
+
+        res.status(200).send({ maintenance: isMaintenance });
+    } catch (error) {
+        console.error('Error fetching maintenance status:', error);
+        res.status(500).send('Server error');
+    }
 });
 
 // Endpoint pour vérifier la validité de la session
@@ -452,6 +475,8 @@ app.post('/login', async (req, res) => {
 // Déconnexion
 app.post('/logout', verifyToken, async (req, res) => {
     try {
+        const connection = await db.promise();
+        await connection.query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [req.userId]);
         res.status(200).send('User logged out successfully');
     } catch (err) {
         console.error('Error logging out user:', err);
