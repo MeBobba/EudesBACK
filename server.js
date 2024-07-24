@@ -18,6 +18,11 @@ const path = require('path');
 app.use(bodyParser.json());
 app.use(cors());
 
+app.use((req, res, next) => {
+    req.setTimeout(0); // Désactive le timeout pour chaque requête
+    next();
+});
+
 // Endpoint pour vérifier la validité de la session
 app.get('/check-session', verifyToken, (req, res) => {
     res.status(200).send({ valid: true });
