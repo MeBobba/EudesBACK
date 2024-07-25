@@ -475,7 +475,7 @@ app.post('/register', async (req, res) => {
     const hashedPassword = bcrypt.hashSync(password, 8);
     const account_created = Math.floor(Date.now() / 1000);
     const last_login = account_created;
-    const motto = 'Nouveau sur EudesCMS';
+    const motto = 'Nouveau sur MeBobba';
     const ip = getClientIp(req);
 
     try {
@@ -577,7 +577,7 @@ app.post('/enable-2fa', verifyToken, async (req, res) => {
     const secret = speakeasy.generateSecret({ length: 20 });
     const url = speakeasy.otpauthURL({
         secret: secret.base32,
-        label: 'EudesCMS',
+        label: 'MeBobba',
         issuer: 'Eudes'
     });
 
@@ -794,6 +794,22 @@ app.put('/update-account', verifyToken, async (req, res) => {
     } catch (err) {
         console.error('Error updating user account:', err);
         res.status(500).send('Server error');
+    }
+});
+
+app.get('/lyrics', async (req, res) => {
+    const { q_track, q_artist } = req.query;
+    try {
+        const response = await axios.get(`https://api.musixmatch.com/ws/1.1/matcher.lyrics.get`, {
+            params: {
+                q_track,
+                q_artist,
+                apikey: process.env.MUSIXMATCH_API_KEY
+            }
+        });
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).send('Error fetching lyrics');
     }
 });
 
