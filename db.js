@@ -31,9 +31,9 @@ const pingDatabase = () => {
     pool.query('SELECT 1', (err) => {
         const currentTime = getCurrentTime();
         if (err) {
-            console.error(`J'ai pas pu ping ta bdd à [${currentTime}] fdp:`, err);
+            console.error(`Error pinging the database at [${currentTime}]:`, err);
         } else {
-            console.log(`J'ai pu ping ta bdd à [${currentTime}] fdp de tes grands morts les chiens d'antarctique de l'ouest chinois`);
+            console.log(`Successfully pinged the database at [${currentTime}]`);
         }
     });
 };
@@ -41,4 +41,4 @@ const pingDatabase = () => {
 // Ping la base de données toutes les 5 minutes
 setInterval(pingDatabase, 300000); // 300000 ms = 5 minutes
 
-module.exports = pool;
+module.exports = pool.promise();
