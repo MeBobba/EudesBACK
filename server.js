@@ -28,33 +28,6 @@ app.use((req, res, next) => {
     next();
 });
 
-app.get('/ping', (req, res) => {
-    res.status(200).send('pong');
-});
-
-setInterval(() => {
-    const options = {
-        hostname: 'localhost',
-        port: port,
-        path: '/ping',
-        method: 'GET',
-    };
-
-    const req = http.request(options, (res) => {
-        console.log(`Ping status: ${res.statusCode}`);
-        res.on('data', (d) => {
-            process.stdout.write(d);
-        });
-    });
-
-    req.on('error', (error) => {
-        console.error(error);
-    });
-
-    req.end();
-}, 300000); // 300000 ms = 5 minutes
-
-
 app.get('/maintenance-status', async (req, res) => {
     try {
         const connection = await db.promise();
