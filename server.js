@@ -14,7 +14,12 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+    cors: {
+        origin: "https://mebobba.com",
+        methods: ["GET", "POST"]
+    }
+});
 
 const port = process.env.PORT || 3000;
 const secretKey = process.env.SECRET_KEY || 'yourSecretKey';
@@ -24,7 +29,7 @@ const path = require('path');
 
 app.use(bodyParser.json());
 app.use(cors());
-app.use('/webhook', bodyParser.raw({ type: 'application/json' }));
+app.use('/webhook', bodyParser.raw({type: 'application/json'}));
 
 app.use((req, res, next) => {
     req.setTimeout(0); // Désactive le timeout pour chaque requête
@@ -32,13 +37,13 @@ app.use((req, res, next) => {
 });
 
 app.post('/create-checkout-session', verifyToken, async (req, res) => {
-    const { packageId } = req.body;
+    const {packageId} = req.body;
 
     // Définir les packages de jetons et leurs prix
     const tokenPackages = {
-        1: { name: 'Small Package', amount: 100, price: 500 },  // prix en centimes
-        2: { name: 'Medium Package', amount: 500, price: 2000 }, // prix en centimes
-        3: { name: 'Large Package', amount: 1000, price: 3500 }  // prix en centimes
+        1: {name: 'Small Package', amount: 100, price: 500},  // prix en centimes
+        2: {name: 'Medium Package', amount: 500, price: 2000}, // prix en centimes
+        3: {name: 'Large Package', amount: 1000, price: 3500}  // prix en centimes
     };
 
     const selectedPackage = tokenPackages[packageId];
@@ -70,14 +75,14 @@ app.post('/create-checkout-session', verifyToken, async (req, res) => {
             }
         });
 
-        res.status(200).send({ url: session.url });
+        res.status(200).send({url: session.url});
     } catch (error) {
         console.error('Error creating Stripe checkout session:', error);
         res.status(500).send('Server error');
     }
 });
 
-app.post('/webhook', bodyParser.raw({ type: 'application/json' }), (req, res) => {
+app.post('/webhook', bodyParser.raw({type: 'application/json'}), (req, res) => {
     const sig = req.headers['stripe-signature'];
 
     let event;
@@ -96,9 +101,9 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), (req, res) =>
 
         // Définir les packages de jetons et leurs montants
         const tokenPackages = {
-            1: { name: 'Small Package', amount: 100 },
-            2: { name: 'Medium Package', amount: 500 },
-            3: { name: 'Large Package', amount: 1000 }
+            1: {name: 'Small Package', amount: 100},
+            2: {name: 'Medium Package', amount: 500},
+            3: {name: 'Large Package', amount: 1000}
         };
 
         const selectedPackage = tokenPackages[packageId];
@@ -128,7 +133,7 @@ app.get('/maintenance-status', async (req, res) => {
             io.emit('maintenance', true);
         }
 
-        res.status(200).send({ maintenance: isMaintenance });
+        res.status(200).send({maintenance: isMaintenance});
     } catch (error) {
         console.error('Error fetching maintenance status:', error);
         res.status(500).send('Server error');
@@ -137,7 +142,7 @@ app.get('/maintenance-status', async (req, res) => {
 
 // Endpoint pour vérifier la validité de la session
 app.get('/check-session', verifyToken, (req, res) => {
-    res.status(200).send({ valid: true });
+    res.status(200).send({valid: true});
 });
 
 // Endpoint pour obtenir les informations du portefeuille de l'utilisateur
@@ -166,7 +171,7 @@ app.post('/generate-credits', verifyToken, async (req, res) => {
         if (userCredits < 10000) {
             const newCredits = userCredits + 10000;
             await db.query('UPDATE users SET credits = ? WHERE id = ?', [newCredits, req.userId]);
-            res.status(200).send({ generatedCredits: 10000 });
+            res.status(200).send({generatedCredits: 10000});
         } else {
             res.status(400).send('You have enough credits.');
         }
@@ -220,7 +225,7 @@ app.post('/generate-pixels', verifyToken, async (req, res) => {
         if (userPixels < 10000) {
             const newPixels = userPixels + 10000;
             await db.query('UPDATE users SET pixels = ? WHERE id = ?', [newPixels, req.userId]);
-            res.status(200).send({ generatedPixels: 10000 });
+            res.status(200).send({generatedPixels: 10000});
         } else {
             res.status(400).send('You have enough pixels.');
         }
@@ -247,7 +252,7 @@ app.get('/tracks/:spotifyId', async (req, res) => {
     const spotifyId = req.params.spotifyId;
     try {
         const [results] = await db.query('SELECT * FROM tracks WHERE spotify_id = ?', [spotifyId]);
-        res.send({ exists: results.length > 0 });
+        res.send({exists: results.length > 0});
     } catch (error) {
         console.error('Error checking track existence:', error);
         res.status(500).send('Server error');
@@ -303,7 +308,7 @@ app.get('/wordfilter', verifyToken, async (req, res) => {
 
 // Endpoint pour les histoires utilisateur (user stories)
 app.get('/stories/:userId', verifyToken, async (req, res) => {
-    const { userId } = req.params;
+    const {userId} = req.params;
     try {
         const [stories] = await db.query('SELECT * FROM stories WHERE user_id = ?', [userId]);
         res.status(200).send(stories);
@@ -314,7 +319,7 @@ app.get('/stories/:userId', verifyToken, async (req, res) => {
 });
 
 function drawLotteryNumbers(betAmount, selectedNumbers) {
-    const numbers = Array.from({ length: 49 }, (_, i) => i + 1);
+    const numbers = Array.from({length: 49}, (_, i) => i + 1);
     const drawnNumbers = [];
     const chanceFactor = Math.min((betAmount - 150) / (1000 - 150), 0.7); // Facteur de chance limité à 0.7
 
@@ -345,7 +350,7 @@ function checkWin(selectedNumbers, drawnNumbers, betAmount) {
 }
 
 app.post('/lottery', verifyToken, async (req, res) => {
-    const { selectedNumbers, betAmount } = req.body;
+    const {selectedNumbers, betAmount} = req.body;
     if (!Array.isArray(selectedNumbers) || selectedNumbers.length !== 6) {
         return res.status(400).send('Invalid input');
     }
@@ -356,7 +361,7 @@ app.post('/lottery', verifyToken, async (req, res) => {
     try {
         const [user] = await db.query('SELECT points FROM users WHERE id = ?', [req.userId]);
         if (user[0].points < betAmount) {
-            return res.status(400).send({ success: false, message: 'You do not have enough points to play.' });
+            return res.status(400).send({success: false, message: 'You do not have enough points to play.'});
         }
 
         const drawnNumbers = drawLotteryNumbers(betAmount, selectedNumbers);
@@ -374,7 +379,7 @@ app.post('/lottery', verifyToken, async (req, res) => {
             [req.userId, betAmount, rewardAmount, 'Points', drawnNumbers.join(',')]
         );
 
-        res.status(200).send({ success: true, drawnNumbers, reward: { amount: rewardAmount, type: 'Points' } });
+        res.status(200).send({success: true, drawnNumbers, reward: {amount: rewardAmount, type: 'Points'}});
     } catch (error) {
         console.error('Error processing lottery:', error);
         res.status(500).send('Server error');
@@ -384,12 +389,14 @@ app.post('/lottery', verifyToken, async (req, res) => {
 app.get('/last-members', async (req, res) => {
     try {
         const [results] = await db.query(
-            `SELECT u.username, l.bet_amount AS betAmount, l.reward_amount AS rewardAmount, l.reward_type AS rewardType,
+            `SELECT u.username,
+                    l.bet_amount                           AS betAmount,
+                    l.reward_amount                        AS rewardAmount,
+                    l.reward_type                          AS rewardType,
                     (l.reward_amount / l.bet_amount * 100) AS probability
              FROM lottery_plays l
-             JOIN users u ON l.user_id = u.id
-             ORDER BY l.created_at DESC
-             LIMIT 10`
+                      JOIN users u ON l.user_id = u.id
+             ORDER BY l.created_at DESC LIMIT 10`
         );
         res.status(200).send(results);
     } catch (error) {
@@ -404,7 +411,7 @@ app.get('/user/points', verifyToken, async (req, res) => {
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
-        res.status(200).send({ points: results[0].points });
+        res.status(200).send({points: results[0].points});
     } catch (error) {
         console.error('Error fetching user points:', error);
         res.status(500).send('Server error');
@@ -425,7 +432,7 @@ app.get('/staff', verifyToken, async (req, res) => {
         const staffSections = await Promise.all(
             ranks.map(async (rank) => {
                 const [users] = await db.query('SELECT * FROM users WHERE rank = ?', [rank.level]);
-                return { rank_name: rank.rank_name, users };
+                return {rank_name: rank.rank_name, users};
             })
         );
 
@@ -454,7 +461,7 @@ app.get('/check-ban', verifyToken, async (req, res) => {
 
 // Ajout de la route /check-2fa
 app.get('/check-2fa', async (req, res) => {
-    const { username } = req.query;
+    const {username} = req.query;
     try {
         const [results] = await db.query('SELECT is_2fa_enabled FROM users WHERE username = ?', [username]);
         if (results.length === 0) {
@@ -462,7 +469,7 @@ app.get('/check-2fa', async (req, res) => {
         }
 
         const user = results[0];
-        res.status(200).send({ is2FAEnabled: user.is_2fa_enabled });
+        res.status(200).send({is2FAEnabled: user.is_2fa_enabled});
     } catch (err) {
         console.error('Error checking 2FA status:', err);
         res.status(500).send('Server error');
@@ -471,7 +478,7 @@ app.get('/check-2fa', async (req, res) => {
 
 // Inscription
 app.post('/register', async (req, res) => {
-    const { username, password, mail, machine_id } = req.body;
+    const {username, password, mail, machine_id} = req.body;
     const hashedPassword = bcrypt.hashSync(password, 8);
     const account_created = Math.floor(Date.now() / 1000);
     const last_login = account_created;
@@ -483,8 +490,8 @@ app.post('/register', async (req, res) => {
             'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current, machine_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [username, hashedPassword, mail, account_created, last_login, motto, ip, ip, machine_id]
         );
-        const token = jwt.sign({ id: result.insertId }, secretKey, { expiresIn: '24h' });
-        res.status(200).send({ auth: true, token });
+        const token = jwt.sign({id: result.insertId}, secretKey, {expiresIn: '24h'});
+        res.status(200).send({auth: true, token});
     } catch (err) {
         console.error('Error registering user:', err);
         res.status(500).send('Server error');
@@ -493,7 +500,7 @@ app.post('/register', async (req, res) => {
 
 // Connexion
 app.post('/login', async (req, res) => {
-    const { username, password, token2fa, machine_id } = req.body;
+    const {username, password, token2fa, machine_id} = req.body;
     const ip = getClientIp(req);
 
     try {
@@ -528,10 +535,10 @@ app.post('/login', async (req, res) => {
             }
         }
 
-        const token = jwt.sign({ id: user.id, rank: user.rank }, secretKey, { expiresIn: '24h' });
+        const token = jwt.sign({id: user.id, rank: user.rank}, secretKey, {expiresIn: '24h'});
 
         await db.query('UPDATE users SET machine_id = ? WHERE id = ?', [machine_id, user.id]);
-        res.status(200).send({ auth: true, token });
+        res.status(200).send({auth: true, token});
     } catch (err) {
         console.error('Error logging in user:', err);
         res.status(500).send('Server error');
@@ -551,8 +558,8 @@ app.post('/logout', verifyToken, async (req, res) => {
 
 // Endpoint pour mettre à jour un post
 app.put('/posts/:postId', verifyToken, async (req, res) => {
-    const { postId } = req.params;
-    const { content } = req.body;
+    const {postId} = req.params;
+    const {content} = req.body;
 
     try {
         const [result] = await db.query(
@@ -574,7 +581,7 @@ app.put('/posts/:postId', verifyToken, async (req, res) => {
 
 // Endpoint pour activer Google Authenticator
 app.post('/enable-2fa', verifyToken, async (req, res) => {
-    const secret = speakeasy.generateSecret({ length: 20 });
+    const secret = speakeasy.generateSecret({length: 20});
     const url = speakeasy.otpauthURL({
         secret: secret.base32,
         label: 'MeBobba',
@@ -584,7 +591,7 @@ app.post('/enable-2fa', verifyToken, async (req, res) => {
     try {
         await db.query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret.base32, req.userId]);
         qrcode.toDataURL(url, (err, data_url) => {
-            res.status(200).send({ secret: secret.base32, dataURL: data_url });
+            res.status(200).send({secret: secret.base32, dataURL: data_url});
         });
     } catch (err) {
         console.error('Error enabling 2FA:', err);
@@ -594,7 +601,7 @@ app.post('/enable-2fa', verifyToken, async (req, res) => {
 
 // Endpoint pour vérifier le code Google Authenticator
 app.post('/verify-2fa', verifyToken, async (req, res) => {
-    const { token } = req.body;
+    const {token} = req.body;
     try {
         const [results] = await db.query('SELECT google_auth_secret FROM users WHERE id = ?', [req.userId]);
         const user = results[0];
@@ -643,10 +650,10 @@ app.get('/dashboard', verifyToken, async (req, res) => {
 
 // Vérification du nom d'utilisateur
 app.post('/check-username', async (req, res) => {
-    const { username } = req.body;
+    const {username} = req.body;
     try {
         const [results] = await db.query('SELECT username FROM users WHERE username = ?', [username]);
-        res.status(200).send({ exists: results.length > 0 });
+        res.status(200).send({exists: results.length > 0});
     } catch (err) {
         console.error('Error checking username:', err);
         res.status(500).send('Server error');
@@ -655,10 +662,10 @@ app.post('/check-username', async (req, res) => {
 
 // Vérification de l'email
 app.post('/check-email', async (req, res) => {
-    const { email } = req.body;
+    const {email} = req.body;
     try {
         const [results] = await db.query('SELECT mail FROM users WHERE mail = ?', [email]);
-        res.status(200).send({ exists: results.length > 0 });
+        res.status(200).send({exists: results.length > 0});
     } catch (err) {
         console.error('Error checking email:', err);
         res.status(500).send('Server error');
@@ -704,69 +711,87 @@ app.delete('/delete-account', verifyToken, async (req, res) => {
         await db.query('START TRANSACTION');
 
         // Delete likes made by the user
-        await db.query(`DELETE FROM likes WHERE user_id = ?`, [userId]);
+        await db.query(`DELETE
+                        FROM likes
+                        WHERE user_id = ?`, [userId]);
 
         // Delete related likes and comments of posts
-        await db.query(`DELETE FROM likes WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)`, [userId]);
-        await db.query(`DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)`, [userId]);
+        await db.query(`DELETE
+                        FROM likes
+                        WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)`, [userId]);
+        await db.query(`DELETE
+                        FROM comments
+                        WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)`, [userId]);
 
         // Delete the posts
-        await db.query(`DELETE FROM posts WHERE user_id = ?`, [userId]);
+        await db.query(`DELETE
+                        FROM posts
+                        WHERE user_id = ?`, [userId]);
 
         // Delete related likes and comments of articles
-        await db.query(`DELETE FROM article_likes WHERE article_id IN (SELECT id FROM articles WHERE user_id = ?)`, [userId]);
-        await db.query(`DELETE FROM article_comments WHERE article_id IN (SELECT id FROM articles WHERE user_id = ?)`, [userId]);
+        await db.query(`DELETE
+                        FROM article_likes
+                        WHERE article_id IN (SELECT id FROM articles WHERE user_id = ?)`, [userId]);
+        await db.query(`DELETE
+                        FROM article_comments
+                        WHERE article_id IN (SELECT id FROM articles WHERE user_id = ?)`, [userId]);
 
         // Delete the articles
-        await db.query(`DELETE FROM articles WHERE user_id = ?`, [userId]);
+        await db.query(`DELETE
+                        FROM articles
+                        WHERE user_id = ?`, [userId]);
 
         // Delete from other related tables
         const tablesToDeleteFrom = [
-            { table: 'bans', column: 'user_id' },
-            { table: 'bots', column: 'user_id' },
-            { table: 'calendar_rewards_claimed', column: 'user_id' },
-            { table: 'camera_web', column: 'user_id' },
-            { table: 'catalog_items_limited', column: 'user_id' },
-            { table: 'chatlogs_private', columns: ['user_to_id', 'user_from_id'] },
-            { table: 'chatlogs_room', columns: ['user_to_id', 'user_from_id'] },
-            { table: 'commandlogs', column: 'user_id' },
-            { table: 'guilds', column: 'user_id' },
-            { table: 'guilds_forums_comments', column: 'user_id' },
-            { table: 'guilds_forums_threads', column: 'opener_id' },
-            { table: 'guilds_members', column: 'user_id' },
-            { table: 'guild_forum_views', column: 'user_id' },
-            { table: 'items', column: 'user_id' },
-            { table: 'items_highscore_data', column: 'user_ids' },
-            { table: 'logs_hc_payday', column: 'user_id' },
-            { table: 'logs_shop_purchases', column: 'user_id' },
-            { table: 'lottery_plays', column: 'user_id' },
-            { table: 'marketplace_items', column: 'user_id' },
-            { table: 'messenger_categories', column: 'user_id' },
-            { table: 'messenger_friendrequests', columns: ['user_to_id', 'user_from_id'] },
-            { table: 'messenger_friendships', columns: ['user_one_id', 'user_two_id'] },
-            { table: 'messenger_offline', columns: ['user_id', 'user_from_id'] },
-            { table: 'namechange_log', column: 'user_id' },
-            { table: 'polls_answers', column: 'user_id' },
-            { table: 'rooms', column: 'owner_id' },
-            { table: 'room_bans', column: 'user_id' },
-            { table: 'room_enter_log', column: 'user_id' },
-            { table: 'room_game_scores', column: 'user_id' },
-            { table: 'room_mutes', column: 'user_id' },
-            { table: 'room_rights', column: 'user_id' },
-            { table: 'room_trade_log', columns: ['user_two_id', 'user_one_id'] },
-            { table: 'room_trade_log_items', column: 'user_id' },
-            { table: 'room_votes', column: 'user_id' },
-            { table: 'sanctions', column: 'habbo_id' },
-            { table: 'stories', column: 'user_id' } // Added stories table
+            {table: 'bans', column: 'user_id'},
+            {table: 'bots', column: 'user_id'},
+            {table: 'calendar_rewards_claimed', column: 'user_id'},
+            {table: 'camera_web', column: 'user_id'},
+            {table: 'catalog_items_limited', column: 'user_id'},
+            {table: 'chatlogs_private', columns: ['user_to_id', 'user_from_id']},
+            {table: 'chatlogs_room', columns: ['user_to_id', 'user_from_id']},
+            {table: 'commandlogs', column: 'user_id'},
+            {table: 'guilds', column: 'user_id'},
+            {table: 'guilds_forums_comments', column: 'user_id'},
+            {table: 'guilds_forums_threads', column: 'opener_id'},
+            {table: 'guilds_members', column: 'user_id'},
+            {table: 'guild_forum_views', column: 'user_id'},
+            {table: 'items', column: 'user_id'},
+            {table: 'items_highscore_data', column: 'user_ids'},
+            {table: 'logs_hc_payday', column: 'user_id'},
+            {table: 'logs_shop_purchases', column: 'user_id'},
+            {table: 'lottery_plays', column: 'user_id'},
+            {table: 'marketplace_items', column: 'user_id'},
+            {table: 'messenger_categories', column: 'user_id'},
+            {table: 'messenger_friendrequests', columns: ['user_to_id', 'user_from_id']},
+            {table: 'messenger_friendships', columns: ['user_one_id', 'user_two_id']},
+            {table: 'messenger_offline', columns: ['user_id', 'user_from_id']},
+            {table: 'namechange_log', column: 'user_id'},
+            {table: 'polls_answers', column: 'user_id'},
+            {table: 'rooms', column: 'owner_id'},
+            {table: 'room_bans', column: 'user_id'},
+            {table: 'room_enter_log', column: 'user_id'},
+            {table: 'room_game_scores', column: 'user_id'},
+            {table: 'room_mutes', column: 'user_id'},
+            {table: 'room_rights', column: 'user_id'},
+            {table: 'room_trade_log', columns: ['user_two_id', 'user_one_id']},
+            {table: 'room_trade_log_items', column: 'user_id'},
+            {table: 'room_votes', column: 'user_id'},
+            {table: 'sanctions', column: 'habbo_id'},
+            {table: 'stories', column: 'user_id'} // Added stories table
         ];
 
         for (const entry of tablesToDeleteFrom) {
             if (Array.isArray(entry.columns)) {
                 for (const column of entry.columns) {
-                    await db.query(`DELETE FROM ${entry.table} WHERE ${column} = ?`, [userId]);
+                    await db.query(`DELETE
+                                    FROM ${entry.table}
+                                    WHERE ${column} = ?`, [userId]);
                 }
             } else {
-                await db.query(`DELETE FROM ${entry.table} WHERE ${entry.column} = ?`, [userId]);
+                await db.query(`DELETE
+                                FROM ${entry.table}
+                                WHERE ${entry.column} = ?`, [userId]);
             }
         }
 
@@ -786,7 +811,7 @@ app.delete('/delete-account', verifyToken, async (req, res) => {
 
 // Endpoint pour mettre à jour les données de l'utilisateur
 app.put('/update-account', verifyToken, async (req, res) => {
-    const { username, real_name, mail, motto, look, gender } = req.body;
+    const {username, real_name, mail, motto, look, gender} = req.body;
     try {
         await db.query('UPDATE users SET username = ?, real_name = ?, mail = ?, motto = ?, look = ?, gender = ? WHERE id = ?',
             [username, real_name, mail, motto, look, gender, req.userId]);
@@ -798,7 +823,7 @@ app.put('/update-account', verifyToken, async (req, res) => {
 });
 
 app.get('/lyrics', async (req, res) => {
-    const { q_track, q_artist } = req.query;
+    const {q_track, q_artist} = req.query;
     try {
         const response = await axios.get(`https://api.musixmatch.com/ws/1.1/matcher.lyrics.get`, {
             params: {
@@ -815,7 +840,7 @@ app.get('/lyrics', async (req, res) => {
 
 // Endpoint pour créer un nouveau post
 app.post('/posts', verifyToken, async (req, res) => {
-    const { content, image, video, visibility } = req.body;
+    const {content, image, video, visibility} = req.body;
 
     try {
         const [[user]] = await db.query('SELECT rank, last_post_time FROM users WHERE id = ?', [req.userId]);
@@ -843,9 +868,9 @@ app.post('/posts', verifyToken, async (req, res) => {
 
         const [newPost] = await db.query(
             `SELECT posts.*, users.username, users.look
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            WHERE posts.id = ?`,
+             FROM posts
+                      JOIN users ON posts.user_id = users.id
+             WHERE posts.id = ?`,
             [result.insertId]
         );
 
@@ -860,48 +885,44 @@ app.post('/posts', verifyToken, async (req, res) => {
 app.get('/posts', verifyToken, async (req, res) => {
     try {
         const [posts] = await db.query(
-            `SELECT posts.*, users.username, users.look,
-            COALESCE(likesCount.likesCount, 0) as likesCount,
-            COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-            userLikes.is_like as userLike
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as likesCount 
-                FROM likes 
-                WHERE is_like = true 
-                GROUP BY post_id
-            ) likesCount ON posts.id = likesCount.post_id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as commentsCount 
-                FROM comments 
-                GROUP BY post_id
-            ) commentsCount ON posts.id = commentsCount.post_id
-            LEFT JOIN (
-                SELECT post_id, is_like 
-                FROM likes 
-                WHERE user_id = ?
-            ) userLikes ON posts.id = userLikes.post_id
-            WHERE posts.user_id = ? OR posts.visibility = "public"
-            OR (posts.visibility = "friends" AND posts.user_id IN (
-                SELECT CASE
-                    WHEN user_one_id = ? THEN user_two_id
-                    WHEN user_two_id = ? THEN user_one_id
-                END AS friend_id
-                FROM messenger_friendships
-                WHERE user_one_id = ? OR user_two_id = ?
-            ))
-            ORDER BY posts.created_at DESC`,
+            `SELECT posts.*,
+                    users.username,
+                    users.look,
+                    COALESCE(likesCount.likesCount, 0)       as likesCount,
+                    COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+                    userLikes.is_like                        as userLike
+             FROM posts
+                      JOIN users ON posts.user_id = users.id
+                      LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
+                                 FROM likes
+                                 WHERE is_like = true
+                                 GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
+                      LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
+                                 FROM comments
+                                 GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
+                      LEFT JOIN (SELECT post_id, is_like
+                                 FROM likes
+                                 WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
+             WHERE posts.user_id = ?
+                OR posts.visibility = "public"
+                OR (posts.visibility = "friends" AND posts.user_id IN (SELECT CASE
+                                                                                  WHEN user_one_id = ? THEN user_two_id
+                                                                                  WHEN user_two_id = ? THEN user_one_id
+                                                                                  END AS friend_id
+                                                                       FROM messenger_friendships
+                                                                       WHERE user_one_id = ?
+                                                                          OR user_two_id = ?))
+             ORDER BY posts.created_at DESC`,
             [req.userId, req.userId, req.userId, req.userId, req.userId, req.userId]
         );
 
         for (let post of posts) {
             const [comments] = await db.query(
                 `SELECT comments.*, users.username, users.look
-                FROM comments
-                JOIN users ON comments.user_id = users.id
-                WHERE comments.post_id = ?
-                ORDER BY comments.created_at DESC`,
+                 FROM comments
+                          JOIN users ON comments.user_id = users.id
+                 WHERE comments.post_id = ?
+                 ORDER BY comments.created_at DESC`,
                 [post.id]
             );
             post.comments = comments;
@@ -916,45 +937,41 @@ app.get('/posts', verifyToken, async (req, res) => {
 
 // Endpoint for retrieving public posts with pagination
 app.get('/public-posts', verifyToken, async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
+    const {page = 1, limit = 10} = req.query;
     const offset = (page - 1) * limit;
     try {
         const [posts] = await db.query(
-            `SELECT DISTINCT posts.*, users.username, users.look,
-            COALESCE(likesCount.likesCount, 0) as likesCount,
-            COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-            userLikes.is_like as userLike
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as likesCount 
-                FROM likes 
-                WHERE is_like = true 
-                GROUP BY post_id
-            ) likesCount ON posts.id = likesCount.post_id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as commentsCount 
-                FROM comments 
-                GROUP BY post_id
-            ) commentsCount ON posts.id = commentsCount.post_id
-            LEFT JOIN (
-                SELECT post_id, is_like 
-                FROM likes 
-                WHERE user_id = ?
-            ) userLikes ON posts.id = userLikes.post_id
-            WHERE posts.visibility = 'public'
-            ORDER BY posts.created_at DESC
-            LIMIT ? OFFSET ?`,
+            `SELECT DISTINCT posts.*,
+                             users.username,
+                             users.look,
+                             COALESCE(likesCount.likesCount, 0)       as likesCount,
+                             COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+                             userLikes.is_like                        as userLike
+             FROM posts
+                      JOIN users ON posts.user_id = users.id
+                      LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
+                                 FROM likes
+                                 WHERE is_like = true
+                                 GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
+                      LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
+                                 FROM comments
+                                 GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
+                      LEFT JOIN (SELECT post_id, is_like
+                                 FROM likes
+                                 WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
+             WHERE posts.visibility = 'public'
+             ORDER BY posts.created_at DESC LIMIT ?
+             OFFSET ?`,
             [req.userId, parseInt(limit), parseInt(offset)]
         );
 
         for (let post of posts) {
             const [comments] = await db.query(
                 `SELECT comments.*, users.username, users.look
-                FROM comments
-                JOIN users ON comments.user_id = users.id
-                WHERE comments.post_id = ?
-                ORDER BY comments.created_at DESC`,
+                 FROM comments
+                          JOIN users ON comments.user_id = users.id
+                 WHERE comments.post_id = ?
+                 ORDER BY comments.created_at DESC`,
                 [post.id]
             );
             post.comments = comments;
@@ -979,7 +996,7 @@ async function deletePostWithComments(postId) {
 
 // Endpoint pour supprimer un post
 app.delete('/posts/:postId', verifyToken, async (req, res) => {
-    const { postId } = req.params;
+    const {postId} = req.params;
     try {
         const [[user]] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
         const userRank = user.rank;
@@ -1006,7 +1023,7 @@ app.delete('/posts/:postId', verifyToken, async (req, res) => {
 
 // Endpoint pour commenter un post
 app.post('/comments', verifyToken, async (req, res) => {
-    const { postId, content } = req.body;
+    const {postId, content} = req.body;
     try {
         const [result] = await db.query(
             'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
@@ -1025,7 +1042,7 @@ app.post('/comments', verifyToken, async (req, res) => {
 
 // Endpoint pour liker/disliker un post
 app.post('/likes', verifyToken, async (req, res) => {
-    const { postId, isLike } = req.body;
+    const {postId, isLike} = req.body;
     try {
         const [existingLike] = await db.query(
             'SELECT * FROM likes WHERE post_id = ? AND user_id = ?',
@@ -1063,7 +1080,7 @@ app.post('/likes', verifyToken, async (req, res) => {
             [postId]
         );
 
-        res.status(201).send({ userLike: likeStatus ? likeStatus.is_like : null, likesCount: likesCount.likesCount });
+        res.status(201).send({userLike: likeStatus ? likeStatus.is_like : null, likesCount: likesCount.likesCount});
     } catch (err) {
         console.error('Error adding like/dislike:', err);
         res.status(500).send('Server error');
@@ -1125,7 +1142,7 @@ app.get('/games/:id', async (req, res) => {
 
 // Route pour récupérer le profil d'un utilisateur par ID
 app.get('/profile/:userId', verifyToken, async (req, res) => {
-    const { userId } = req.params;
+    const {userId} = req.params;
     try {
         const [users] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
         if (users.length === 0) {
@@ -1140,7 +1157,7 @@ app.get('/profile/:userId', verifyToken, async (req, res) => {
 
 // Ajout de la route pour la recherche d'utilisateurs
 app.get('/search-users', verifyToken, async (req, res) => {
-    const { query } = req.query;
+    const {query} = req.query;
     try {
         const [results] = await db.query('SELECT id, username FROM users WHERE username LIKE ?', [`%${query}%`]);
         res.status(200).send(results);
@@ -1185,40 +1202,37 @@ app.get('/posts/:userId', verifyToken, async (req, res) => {
     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
     try {
         const [posts] = await db.query(
-            `SELECT posts.*, users.username, users.look,
-            COALESCE(likesCount.likesCount, 0) as likesCount,
-            COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-            userLikes.is_like as userLike
-            FROM posts
-            JOIN users ON posts.user_id = users.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as likesCount 
-                FROM likes 
-                WHERE is_like = true 
-                GROUP BY post_id
-            ) likesCount ON posts.id = likesCount.post_id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) as commentsCount 
-                FROM comments 
-                GROUP BY post_id
-            ) commentsCount ON posts.id = commentsCount.post_id
-            LEFT JOIN (
-                SELECT post_id, is_like 
-                FROM likes 
-                WHERE user_id = ?
-            ) userLikes ON posts.id = userLikes.post_id
-            WHERE posts.user_id = ? AND posts.visibility = "public"
-            ORDER BY posts.created_at DESC`,
+            `SELECT posts.*,
+                    users.username,
+                    users.look,
+                    COALESCE(likesCount.likesCount, 0)       as likesCount,
+                    COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+                    userLikes.is_like                        as userLike
+             FROM posts
+                      JOIN users ON posts.user_id = users.id
+                      LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
+                                 FROM likes
+                                 WHERE is_like = true
+                                 GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
+                      LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
+                                 FROM comments
+                                 GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
+                      LEFT JOIN (SELECT post_id, is_like
+                                 FROM likes
+                                 WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
+             WHERE posts.user_id = ?
+               AND posts.visibility = "public"
+             ORDER BY posts.created_at DESC`,
             [req.userId, userId]
         );
 
         for (let post of posts) {
             const [comments] = await db.query(
                 `SELECT comments.*, users.username, users.look
-                FROM comments
-                JOIN users ON comments.user_id = users.id
-                WHERE comments.post_id = ?
-                ORDER BY comments.created_at DESC`,
+                 FROM comments
+                          JOIN users ON comments.user_id = users.id
+                 WHERE comments.post_id = ?
+                 ORDER BY comments.created_at DESC`,
                 [post.id]
             );
             post.comments = comments;
@@ -1244,7 +1258,7 @@ app.get('/articles', async (req, res) => {
 
 // Endpoint pour récupérer un article par ID
 app.get('/articles/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
+    const {id} = req.params;
     const userId = req.userId; // Assurez-vous que verifyToken est utilisé pour définir req.userId
     try {
         const [articles] = await db.query('SELECT * FROM articles WHERE id = ?', [id]);
@@ -1274,11 +1288,11 @@ app.get('/articles/:id', verifyToken, async (req, res) => {
 
         // Récupérer les commentaires
         const [comments] = await db.query(
-            `SELECT article_comments.*, users.username, users.look 
-            FROM article_comments 
-            JOIN users ON article_comments.user_id = users.id 
-            WHERE article_comments.article_id = ? 
-            ORDER BY article_comments.created_at DESC`,
+            `SELECT article_comments.*, users.username, users.look
+             FROM article_comments
+                      JOIN users ON article_comments.user_id = users.id
+             WHERE article_comments.article_id = ?
+             ORDER BY article_comments.created_at DESC`,
             [id]
         );
 
@@ -1296,8 +1310,8 @@ app.get('/articles/:id', verifyToken, async (req, res) => {
 
 // Endpoint for liking/disliking an article
 app.post('/articles/:articleId/likes', verifyToken, async (req, res) => {
-    const { articleId } = req.params;
-    const { isLike } = req.body;
+    const {articleId} = req.params;
+    const {isLike} = req.body;
     try {
         const [existingLike] = await db.query(
             'SELECT * FROM article_likes WHERE article_id = ? AND user_id = ?',
@@ -1326,7 +1340,7 @@ app.post('/articles/:articleId/likes', verifyToken, async (req, res) => {
             [articleId]
         );
 
-        res.status(201).send({ userLike: likeStatus.is_like, likesCount: likesCount.likesCount });
+        res.status(201).send({userLike: likeStatus.is_like, likesCount: likesCount.likesCount});
     } catch (err) {
         console.error('Error adding like/dislike:', err);
         res.status(500).send('Server error');
@@ -1335,8 +1349,8 @@ app.post('/articles/:articleId/likes', verifyToken, async (req, res) => {
 
 // Endpoint for commenting on an article
 app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
-    const { articleId } = req.params;
-    const { content } = req.body;
+    const {articleId} = req.params;
+    const {content} = req.body;
 
     try {
         const [[user]] = await db.query('SELECT last_comment_time FROM users WHERE id = ?', [req.userId]);
@@ -1368,7 +1382,7 @@ app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
 
 // Endpoint pour supprimer un commentaire d'article
 app.delete('/article-comments/:commentId', verifyToken, async (req, res) => {
-    const { commentId } = req.params;
+    const {commentId} = req.params;
     try {
         const [[comment]] = await db.query('SELECT user_id FROM article_comments WHERE id = ?', [commentId]);
         if (!comment) {
@@ -1390,7 +1404,7 @@ app.delete('/article-comments/:commentId', verifyToken, async (req, res) => {
 
 // Endpoint pour supprimer un commentaire d'article
 app.delete('/comments/:commentId', verifyToken, async (req, res) => {
-    const { commentId } = req.params;
+    const {commentId} = req.params;
     try {
         const [[comment]] = await db.query('SELECT user_id FROM comments WHERE id = ?', [commentId]);
         if (!comment) {
@@ -1412,7 +1426,7 @@ app.delete('/comments/:commentId', verifyToken, async (req, res) => {
 
 // Endpoint for creating a new article
 app.post('/articles', verifyToken, async (req, res) => {
-    const { title, summary, content, image } = req.body;
+    const {title, summary, content, image} = req.body;
     const userId = req.userId;
 
     if (req.userRank < 5) {
@@ -1425,7 +1439,15 @@ app.post('/articles', verifyToken, async (req, res) => {
             'INSERT INTO articles (title, summary, content, image, date, user_id) VALUES (?, ?, ?, ?, ?, ?)',
             [title, summary, content, image, currentTimeUTC, userId]
         );
-        res.status(201).send({ id: result.insertId, title, summary, content, image, date: currentTimeUTC, user_id: userId });
+        res.status(201).send({
+            id: result.insertId,
+            title,
+            summary,
+            content,
+            image,
+            date: currentTimeUTC,
+            user_id: userId
+        });
     } catch (err) {
         console.error('Error creating article:', err);
         res.status(500).send('Server error');
@@ -1434,8 +1456,8 @@ app.post('/articles', verifyToken, async (req, res) => {
 
 // Endpoint for updating an article
 app.put('/articles/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
-    const { title, summary, content, image } = req.body;
+    const {id} = req.params;
+    const {title, summary, content, image} = req.body;
     if (req.userRank < 5) {
         return res.status(403).send('Not authorized to edit articles');
     }
@@ -1453,7 +1475,7 @@ app.put('/articles/:id', verifyToken, async (req, res) => {
 
 // Endpoint for deleting an article
 app.delete('/articles/:id', verifyToken, async (req, res) => {
-    const { id } = req.params;
+    const {id} = req.params;
 
     if (req.userRank < 5) {
         return res.status(403).send('Not authorized to delete articles');
