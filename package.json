@@ -22,6 +22,7 @@
     "mysql2": "^3.10.3",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
-    "speakeasy": "^2.0.0"
+    "speakeasy": "^2.0.0",
+    "stripe": "^16.4.0"
   }
 }
