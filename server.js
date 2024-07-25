@@ -9,6 +9,7 @@ const db = require('./db');
 require('dotenv').config();
 const http = require('http');
 const socketIo = require('socket.io');
+const moment = require('moment-timezone');
 
 const app = express();
 const server = http.createServer(app);
@@ -1229,15 +1230,18 @@ app.delete('/comments/:commentId', verifyToken, async (req, res) => {
 // Endpoint for creating a new article
 app.post('/articles', verifyToken, async (req, res) => {
     const { title, summary, content, image } = req.body;
+
     if (req.userRank < 5) {
         return res.status(403).send('Not authorized to create articles');
     }
+
     try {
+        const currentTimeUTC = moment.utc().format(); // ISO 8601 format with UTC timezone
         const [result] = await db.query(
-            'INSERT INTO articles (title, summary, content, image) VALUES (?, ?, ?, ?)',
-            [title, summary, content, image]
+            'INSERT INTO articles (title, summary, content, image, date) VALUES (?, ?, ?, ?, ?)',
+            [title, summary, content, image, currentTimeUTC]
         );
-        res.status(201).send({ id: result.insertId, title, summary, content, image });
+        res.status(201).send({ id: result.insertId, title, summary, content, image, date: currentTimeUTC });
     } catch (err) {
         console.error('Error creating article:', err);
         res.status(500).send('Server error');
@@ -1266,13 +1270,35 @@ app.put('/articles/:id', verifyToken, async (req, res) => {
 // Endpoint for deleting an article
 app.delete('/articles/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
+
     if (req.userRank < 5) {
         return res.status(403).send('Not authorized to delete articles');
     }
+
     try {
-        await db.query('DELETE FROM articles WHERE id = ?', [id]);
-        res.status(200).send('Article deleted successfully');
+        // Start a transaction
+        await db.query('START TRANSACTION');
+
+        // Delete related comments
+        await db.query('DELETE FROM article_comments WHERE article_id = ?', [id]);
+
+        // Delete related likes
+        await db.query('DELETE FROM article_likes WHERE article_id = ?', [id]);
+
+        // Delete the article
+        const [result] = await db.query('DELETE FROM articles WHERE id = ?', [id]);
+
+        if (result.affectedRows === 0) {
+            await db.query('ROLLBACK');
+            return res.status(404).send('Article not found');
+        }
+
+        // Commit the transaction
+        await db.query('COMMIT');
+
+        res.status(200).send('Article and related data deleted successfully');
     } catch (err) {
+        await db.query('ROLLBACK');
         console.error('Error deleting article:', err);
         res.status(500).send('Server error');
     }
