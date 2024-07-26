@@ -1,4 +1,5 @@
 const db = require("../db");
+const moment = require("moment-timezone");
 
 exports.getArticles = async (req, res) => {
     try {
@@ -127,6 +128,110 @@ exports.addComment = async (req, res) => {
         res.status(201).send(comment[0]);
     } catch (err) {
         console.error('Error adding comment:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.deleteComment = async (req, res) => {
+    const { commentId } = req.params;
+    try {
+        const [[comment]] = await db.query('SELECT user_id FROM article_comments WHERE id = ?', [commentId]);
+        if (!comment) {
+            return res.status(404).send('Comment not found');
+        }
+
+        const [[user]] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+        if (user.rank < 5 && comment.user_id !== req.userId) {
+            return res.status(403).send('Not authorized to delete this comment');
+        }
+
+        await db.query('DELETE FROM article_comments WHERE id = ?', [commentId]);
+        res.status(200).send('Comment deleted successfully');
+    } catch (err) {
+        console.error('Error deleting comment:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.createArticle = async (req, res) => {
+    const { title, summary, content, image } = req.body;
+    const userId = req.userId;
+
+    if (req.userRank < 5) {
+        return res.status(403).send('Not authorized to create articles');
+    }
+
+    try {
+        const currentTimeUTC = moment.utc().format().replace('T', ' ').replace('Z', ' '); // ISO 8601 format with UTC timezone
+        const [result] = await db.query(
+            'INSERT INTO articles (title, summary, content, image, date, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [title, summary, content, image, currentTimeUTC, userId]
+        );
+        res.status(201).send({
+            id: result.insertId,
+            title,
+            summary,
+            content,
+            image,
+            date: currentTimeUTC,
+            user_id: userId
+        });
+    } catch (err) {
+        console.error('Error creating article:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.updateArticle = async (req, res) => {
+    const { id } = req.params;
+    const { title, summary, content, image } = req.body;
+    if (req.userRank < 5) {
+        return res.status(403).send('Not authorized to edit articles');
+    }
+    try {
+        await db.query(
+            'UPDATE articles SET title = ?, summary = ?, content = ?, image = ? WHERE id = ?',
+            [title, summary, content, image, id]
+        );
+        res.status(200).send('Article updated successfully');
+    } catch (err) {
+        console.error('Error updating article:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.deleteArticle = async (req, res) => {
+    const { id } = req.params;
+
+    if (req.userRank < 5) {
+        return res.status(403).send('Not authorized to delete articles');
+    }
+
+    try {
+        // Start a transaction
+        await db.query('START TRANSACTION');
+
+        // Delete related comments
+        await db.query('DELETE FROM article_comments WHERE article_id = ?', [id]);
+
+        // Delete related likes
+        await db.query('DELETE FROM article_likes WHERE article_id = ?', [id]);
+
+        // Delete the article
+        const [result] = await db.query('DELETE FROM articles WHERE id = ?', [id]);
+
+        if (result.affectedRows === 0) {
+            await db.query('ROLLBACK');
+            return res.status(404).send('Article not found');
+        }
+
+        // Commit the transaction
+        await db.query('COMMIT');
+
+        res.status(200).send('Article and related data deleted successfully');
+    } catch (err) {
+        await db.query('ROLLBACK');
+        console.error('Error deleting article:', err);
         res.status(500).send('Server error');
     }
 };
