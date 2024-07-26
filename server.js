@@ -11,6 +11,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const moment = require('moment-timezone');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -140,11 +141,6 @@ app.get('/maintenance-status', async (req, res) => {
     }
 });
 
-// Endpoint pour vérifier la validité de la session
-app.get('/check-session', verifyToken, (req, res) => {
-    res.status(200).send({valid: true});
-});
-
 // Endpoint pour obtenir les informations du portefeuille de l'utilisateur
 app.get('/user/wallet', verifyToken, async (req, res) => {
     try {
@@ -241,12 +237,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Fonction pour obtenir l'IP du client
-function getClientIp(req) {
-    const forwarded = req.headers['x-forwarded-for'];
-    return forwarded ? forwarded.split(',').shift() : req.connection.remoteAddress;
-}
-
 // Endpoint pour vérifier l'existence d'une piste
 app.get('/tracks/:spotifyId', async (req, res) => {
     const spotifyId = req.params.spotifyId;
@@ -280,20 +270,6 @@ app.post('/tracks', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
-// Fonction pour vérifier si un utilisateur est banni
-async function checkBan(userId, ip, machineId) {
-    try {
-        const [results] = await db.query(
-            'SELECT * FROM bans WHERE (user_id = ? OR ip = ? OR machine_id = ?) AND (ban_expire = 0 OR ban_expire > UNIX_TIMESTAMP())',
-            [userId, ip, machineId]
-        );
-        return results.length > 0;
-    } catch (err) {
-        console.error('Error checking ban status:', err);
-        throw new Error('Server error');
-    }
-}
 
 // Endpoint pour les filtres de mots
 app.get('/wordfilter', verifyToken, async (req, res) => {
@@ -499,62 +475,62 @@ app.post('/register', async (req, res) => {
 });
 
 // Connexion
-app.post('/login', async (req, res) => {
-    const {username, password, token2fa, machine_id} = req.body;
-    const ip = getClientIp(req);
-
-    try {
-        const [results] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
-        if (results.length === 0) {
-            return res.status(404).send('User not found');
-        }
-
-        const user = results[0];
-
-        // Vérifier les bannissements
-        const isBanned = await checkBan(user.id, ip, machine_id);
-        if (isBanned) {
-            return res.status(403).send('User is banned');
-        }
-
-        const passwordIsValid = await bcrypt.compare(password, user.password);
-        if (!passwordIsValid) {
-            return res.status(401).send('Invalid password');
-        }
-
-        // Vérifier le token 2FA si activé
-        if (user.is_2fa_enabled) {
-            const verified = speakeasy.totp.verify({
-                secret: user.google_auth_secret,
-                encoding: 'base32',
-                token: token2fa,
-                window: 1 // Permet une légère dérive temporelle
-            });
-            if (!verified) {
-                return res.status(401).send('Invalid 2FA token');
-            }
-        }
-
-        const token = jwt.sign({id: user.id, rank: user.rank}, secretKey, {expiresIn: '24h'});
-
-        await db.query('UPDATE users SET machine_id = ? WHERE id = ?', [machine_id, user.id]);
-        res.status(200).send({auth: true, token});
-    } catch (err) {
-        console.error('Error logging in user:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.post('/login', async (req, res) => {
+//     const {username, password, token2fa, machine_id} = req.body;
+//     const ip = getClientIp(req);
+//
+//     try {
+//         const [results] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
+//         if (results.length === 0) {
+//             return res.status(404).send('User not found');
+//         }
+//
+//         const user = results[0];
+//
+//         // Vérifier les bannissements
+//         const isBanned = await checkBan(user.id, ip, machine_id);
+//         if (isBanned) {
+//             return res.status(403).send('User is banned');
+//         }
+//
+//         const passwordIsValid = await bcrypt.compare(password, user.password);
+//         if (!passwordIsValid) {
+//             return res.status(401).send('Invalid password');
+//         }
+//
+//         // Vérifier le token 2FA si activé
+//         if (user.is_2fa_enabled) {
+//             const verified = speakeasy.totp.verify({
+//                 secret: user.google_auth_secret,
+//                 encoding: 'base32',
+//                 token: token2fa,
+//                 window: 1 // Permet une légère dérive temporelle
+//             });
+//             if (!verified) {
+//                 return res.status(401).send('Invalid 2FA token');
+//             }
+//         }
+//
+//         const token = jwt.sign({id: user.id, rank: user.rank}, secretKey, {expiresIn: '24h'});
+//
+//         await db.query('UPDATE users SET machine_id = ? WHERE id = ?', [machine_id, user.id]);
+//         res.status(200).send({auth: true, token});
+//     } catch (err) {
+//         console.error('Error logging in user:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Déconnexion
-app.post('/logout', verifyToken, async (req, res) => {
-    try {
-        await db.query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [req.userId]);
-        res.status(200).send('User logged out successfully');
-    } catch (err) {
-        console.error('Error logging out user:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.post('/logout', verifyToken, async (req, res) => {
+//     try {
+//         await db.query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [req.userId]);
+//         res.status(200).send('User logged out successfully');
+//     } catch (err) {
+//         console.error('Error logging out user:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour mettre à jour un post
 app.put('/posts/:postId', verifyToken, async (req, res) => {
@@ -1534,6 +1510,10 @@ function verifyToken(req, res, next) {
         next();
     });
 }
+
+// gestion des routes par modules
+// routes pour authentification
+app.use('/auth', authRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
