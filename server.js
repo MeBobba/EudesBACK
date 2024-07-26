@@ -13,6 +13,7 @@ const moment = require('moment-timezone');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const authRoutes = require('./routes/authRoutes');
 const articleRoutes = require('./routes/articleRoutes');
+const postRoutes = require('./routes/postRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -477,86 +478,6 @@ app.get('/check-2fa', async (req, res) => {
     }
 });
 
-// Inscription
-// app.post('/register', async (req, res) => {
-//     const {username, password, mail, machine_id} = req.body;
-//     const hashedPassword = bcrypt.hashSync(password, 8);
-//     const account_created = Math.floor(Date.now() / 1000);
-//     const last_login = account_created;
-//     const motto = 'Nouveau sur MeBobba';
-//     const ip = getClientIp(req);
-//
-//     try {
-//         const [result] = await db.query(
-//             'INSERT INTO users (username, password, mail, account_created, last_login, motto, ip_register, ip_current, machine_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-//             [username, hashedPassword, mail, account_created, last_login, motto, ip, ip, machine_id]
-//         );
-//         const token = jwt.sign({id: result.insertId}, secretKey, {expiresIn: '24h'});
-//         res.status(200).send({auth: true, token});
-//     } catch (err) {
-//         console.error('Error registering user:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Connexion
-// app.post('/login', async (req, res) => {
-//     const {username, password, token2fa, machine_id} = req.body;
-//     const ip = getClientIp(req);
-//
-//     try {
-//         const [results] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
-//         if (results.length === 0) {
-//             return res.status(404).send('User not found');
-//         }
-//
-//         const user = results[0];
-//
-//         // Vérifier les bannissements
-//         const isBanned = await checkBan(user.id, ip, machine_id);
-//         if (isBanned) {
-//             return res.status(403).send('User is banned');
-//         }
-//
-//         const passwordIsValid = await bcrypt.compare(password, user.password);
-//         if (!passwordIsValid) {
-//             return res.status(401).send('Invalid password');
-//         }
-//
-//         // Vérifier le token 2FA si activé
-//         if (user.is_2fa_enabled) {
-//             const verified = speakeasy.totp.verify({
-//                 secret: user.google_auth_secret,
-//                 encoding: 'base32',
-//                 token: token2fa,
-//                 window: 1 // Permet une légère dérive temporelle
-//             });
-//             if (!verified) {
-//                 return res.status(401).send('Invalid 2FA token');
-//             }
-//         }
-//
-//         const token = jwt.sign({id: user.id, rank: user.rank}, secretKey, {expiresIn: '24h'});
-//
-//         await db.query('UPDATE users SET machine_id = ? WHERE id = ?', [machine_id, user.id]);
-//         res.status(200).send({auth: true, token});
-//     } catch (err) {
-//         console.error('Error logging in user:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Déconnexion
-// app.post('/logout', verifyToken, async (req, res) => {
-//     try {
-//         await db.query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [req.userId]);
-//         res.status(200).send('User logged out successfully');
-//     } catch (err) {
-//         console.error('Error logging out user:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
 // Endpoint pour mettre à jour un post
 app.put('/posts/:postId', verifyToken, async (req, res) => {
     const { postId } = req.params;
@@ -840,253 +761,244 @@ app.get('/lyrics', async (req, res) => {
 });
 
 // Endpoint pour créer un nouveau post
-app.post('/posts', verifyToken, async (req, res) => {
-    const { content, image, video, visibility } = req.body;
-
-    try {
-        const [[user]] = await db.query('SELECT rank, last_post_time FROM users WHERE id = ?', [req.userId]);
-        const currentTime = Math.floor(Date.now() / 1000);
-
-        // Check for flood protection
-        if (user.rank < 5 && user.last_post_time && (currentTime - user.last_post_time < 15)) {
-            return res.status(429).send('You must wait 15 seconds before posting again.');
-        }
-
-        // Apply wordfilter
-        const [wordFilters] = await db.query('SELECT * FROM wordfilter');
-        let filteredContent = content;
-        wordFilters.forEach(filter => {
-            const regex = new RegExp(`\\b${filter.key}\\b`, 'gi');
-            filteredContent = filteredContent.replace(regex, filter.replacement);
-        });
-
-        const [result] = await db.query(
-            'INSERT INTO posts (user_id, content, image, video, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [req.userId, filteredContent, image, video, visibility, new Date()]
-        );
-
-        await db.query('UPDATE users SET last_post_time = ? WHERE id = ?', [currentTime, req.userId]);
-
-        const [newPost] = await db.query(
-            `SELECT posts.*, users.username, users.look
-             FROM posts
-                      JOIN users ON posts.user_id = users.id
-             WHERE posts.id = ?`,
-            [result.insertId]
-        );
-
-        res.status(201).send(newPost[0]);
-    } catch (err) {
-        console.error('Error creating post:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.post('/posts', verifyToken, async (req, res) => {
+//     const { content, image, video, visibility } = req.body;
+//
+//     try {
+//         const [[user]] = await db.query('SELECT rank, last_post_time FROM users WHERE id = ?', [req.userId]);
+//         const currentTime = Math.floor(Date.now() / 1000);
+//
+//         // Check for flood protection
+//         if (user.rank < 5 && user.last_post_time && (currentTime - user.last_post_time < 15)) {
+//             return res.status(429).send('You must wait 15 seconds before posting again.');
+//         }
+//
+//         // Apply wordfilter
+//         const [wordFilters] = await db.query('SELECT * FROM wordfilter');
+//         let filteredContent = content;
+//         wordFilters.forEach(filter => {
+//             const regex = new RegExp(`\\b${filter.key}\\b`, 'gi');
+//             filteredContent = filteredContent.replace(regex, filter.replacement);
+//         });
+//
+//         const [result] = await db.query(
+//             'INSERT INTO posts (user_id, content, image, video, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+//             [req.userId, filteredContent, image, video, visibility, new Date()]
+//         );
+//
+//         await db.query('UPDATE users SET last_post_time = ? WHERE id = ?', [currentTime, req.userId]);
+//
+//         const [newPost] = await db.query(
+//             `SELECT posts.*, users.username, users.look
+//              FROM posts
+//                       JOIN users ON posts.user_id = users.id
+//              WHERE posts.id = ?`,
+//             [result.insertId]
+//         );
+//
+//         res.status(201).send(newPost[0]);
+//     } catch (err) {
+//         console.error('Error creating post:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour récupérer les posts de l'utilisateur
-app.get('/posts', verifyToken, async (req, res) => {
-    try {
-        const [posts] = await db.query(
-            `SELECT posts.*,
-                    users.username,
-                    users.look,
-                    COALESCE(likesCount.likesCount, 0)       as likesCount,
-                    COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-                    userLikes.is_like                        as userLike
-             FROM posts
-                      JOIN users ON posts.user_id = users.id
-                      LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
-                                 FROM likes
-                                 WHERE is_like = true
-                                 GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
-                      LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
-                                 FROM comments
-                                 GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
-                      LEFT JOIN (SELECT post_id, is_like
-                                 FROM likes
-                                 WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
-             WHERE posts.user_id = ?
-                OR posts.visibility = "public"
-                OR (posts.visibility = "friends" AND posts.user_id IN (SELECT CASE
-                                                                                  WHEN user_one_id = ? THEN user_two_id
-                                                                                  WHEN user_two_id = ? THEN user_one_id
-                                                                                  END AS friend_id
-                                                                       FROM messenger_friendships
-                                                                       WHERE user_one_id = ?
-                                                                          OR user_two_id = ?))
-             ORDER BY posts.created_at DESC`,
-            [req.userId, req.userId, req.userId, req.userId, req.userId, req.userId]
-        );
-
-        for (let post of posts) {
-            const [comments] = await db.query(
-                `SELECT comments.*, users.username, users.look
-                 FROM comments
-                          JOIN users ON comments.user_id = users.id
-                 WHERE comments.post_id = ?
-                 ORDER BY comments.created_at DESC`,
-                [post.id]
-            );
-            post.comments = comments;
-        }
-
-        res.status(200).send(posts);
-    } catch (err) {
-        console.error('Error fetching posts:', err);
-        res.status(500).send('Server error');
-    }
-});
+// todo: à quoi ça sert ?? c'est pas sur le front
+// app.get('/posts', verifyToken, async (req, res) => {
+//     try {
+//         const [posts] = await db.query(
+//             `SELECT posts.*,
+//                     users.username,
+//                     users.look,
+//                     COALESCE(likesCount.likesCount, 0)       as likesCount,
+//                     COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+//                     userLikes.is_like                        as userLike
+//              FROM posts
+//                       JOIN users ON posts.user_id = users.id
+//                       LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
+//                                  FROM likes
+//                                  WHERE is_like = true
+//                                  GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
+//                       LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
+//                                  FROM comments
+//                                  GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
+//                       LEFT JOIN (SELECT post_id, is_like
+//                                  FROM likes
+//                                  WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
+//              WHERE posts.user_id = ?
+//                 OR posts.visibility = "public"
+//                 OR (posts.visibility = "friends" AND posts.user_id IN (SELECT CASE
+//                                                                                   WHEN user_one_id = ? THEN user_two_id
+//                                                                                   WHEN user_two_id = ? THEN user_one_id
+//                                                                                   END AS friend_id
+//                                                                        FROM messenger_friendships
+//                                                                        WHERE user_one_id = ?
+//                                                                           OR user_two_id = ?))
+//              ORDER BY posts.created_at DESC`,
+//             [req.userId, req.userId, req.userId, req.userId, req.userId, req.userId]
+//         );
+//
+//         for (let post of posts) {
+//             const [comments] = await db.query(
+//                 `SELECT comments.*, users.username, users.look
+//                  FROM comments
+//                           JOIN users ON comments.user_id = users.id
+//                  WHERE comments.post_id = ?
+//                  ORDER BY comments.created_at DESC`,
+//                 [post.id]
+//             );
+//             post.comments = comments;
+//         }
+//
+//         res.status(200).send(posts);
+//     } catch (err) {
+//         console.error('Error fetching posts:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint for retrieving public posts with pagination
-app.get('/public-posts', verifyToken, async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-    try {
-        const [posts] = await db.query(
-            `SELECT DISTINCT posts.*,
-                             users.username,
-                             users.look,
-                             COALESCE(likesCount.likesCount, 0)       as likesCount,
-                             COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-                             userLikes.is_like                        as userLike
-             FROM posts
-                      JOIN users ON posts.user_id = users.id
-                      LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
-                                 FROM likes
-                                 WHERE is_like = true
-                                 GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
-                      LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
-                                 FROM comments
-                                 GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
-                      LEFT JOIN (SELECT post_id, is_like
-                                 FROM likes
-                                 WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
-             WHERE posts.visibility = 'public'
-             ORDER BY posts.created_at DESC LIMIT ?
-             OFFSET ?`,
-            [req.userId, parseInt(limit), parseInt(offset)]
-        );
-
-        for (let post of posts) {
-            const [comments] = await db.query(
-                `SELECT comments.*, users.username, users.look
-                 FROM comments
-                          JOIN users ON comments.user_id = users.id
-                 WHERE comments.post_id = ?
-                 ORDER BY comments.created_at DESC`,
-                [post.id]
-            );
-            post.comments = comments;
-        }
-
-        res.status(200).send(posts);
-    } catch (err) {
-        console.error('Error fetching public posts:', err);
-        res.status(500).send('Server error');
-    }
-});
-
-async function deletePostWithComments(postId) {
-    try {
-        await db.query('DELETE FROM comments WHERE post_id = ?', [postId]);
-        await db.query('DELETE FROM likes WHERE post_id = ?', [postId]);
-        await db.query('DELETE FROM posts WHERE id = ?', [postId]);
-    } catch (err) {
-        throw err;
-    }
-}
+// app.get('/public-posts', verifyToken, async (req, res) => {
+//     const { page = 1, limit = 10 } = req.query;
+//     const offset = (page - 1) * limit;
+//     try {
+//         const [posts] = await db.query(
+//             `SELECT DISTINCT posts.*,
+//                              users.username,
+//                              users.look,
+//                              COALESCE(likesCount.likesCount, 0)       as likesCount,
+//                              COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+//                              userLikes.is_like                        as userLike
+//              FROM posts
+//                       JOIN users ON posts.user_id = users.id
+//                       LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
+//                                  FROM likes
+//                                  WHERE is_like = true
+//                                  GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
+//                       LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
+//                                  FROM comments
+//                                  GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
+//                       LEFT JOIN (SELECT post_id, is_like
+//                                  FROM likes
+//                                  WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
+//              WHERE posts.visibility = 'public'
+//              ORDER BY posts.created_at DESC LIMIT ?
+//              OFFSET ?`,
+//             [req.userId, parseInt(limit), parseInt(offset)]
+//         );
+//
+//         for (let post of posts) {
+//             const [comments] = await db.query(
+//                 `SELECT comments.*, users.username, users.look
+//                  FROM comments
+//                           JOIN users ON comments.user_id = users.id
+//                  WHERE comments.post_id = ?
+//                  ORDER BY comments.created_at DESC`,
+//                 [post.id]
+//             );
+//             post.comments = comments;
+//         }
+//
+//         res.status(200).send(posts);
+//     } catch (err) {
+//         console.error('Error fetching public posts:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour supprimer un post
-app.delete('/posts/:postId', verifyToken, async (req, res) => {
-    const { postId } = req.params;
-    try {
-        const [[user]] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
-        const userRank = user.rank;
-
-        const [[post]] = await db.query('SELECT user_id FROM posts WHERE id = ?', [postId]);
-        if (!post) {
-            return res.status(404).send('Post not found');
-        }
-
-        const postOwnerId = post.user_id;
-
-        if (userRank < 5 && postOwnerId !== req.userId) {
-            return res.status(403).send('Not authorized to delete this post');
-        }
-
-        await deletePostWithComments(postId);
-
-        res.status(200).send('Post deleted successfully');
-    } catch (err) {
-        console.error('Error deleting post:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.delete('/posts/:postId', verifyToken, async (req, res) => {
+//     const { postId } = req.params;
+//     try {
+//         const [[user]] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+//         const userRank = user.rank;
+//
+//         const [[post]] = await db.query('SELECT user_id FROM posts WHERE id = ?', [postId]);
+//         if (!post) {
+//             return res.status(404).send('Post not found');
+//         }
+//
+//         const postOwnerId = post.user_id;
+//
+//         if (userRank < 5 && postOwnerId !== req.userId) {
+//             return res.status(403).send('Not authorized to delete this post');
+//         }
+//
+//         await deletePostWithComments(postId);
+//
+//         res.status(200).send('Post deleted successfully');
+//     } catch (err) {
+//         console.error('Error deleting post:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour commenter un post
-app.post('/comments', verifyToken, async (req, res) => {
-    const { postId, content } = req.body;
-    try {
-        const [result] = await db.query(
-            'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
-            [postId, req.userId, content]
-        );
-        const [comment] = await db.query(
-            'SELECT comments.*, users.username, users.look FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?',
-            [result.insertId]
-        );
-        res.status(201).send(comment[0]);
-    } catch (err) {
-        console.error('Error adding comment:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.post('/comments', verifyToken, async (req, res) => {
+//     const { postId, content } = req.body;
+//     try {
+//         const [result] = await db.query(
+//             'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
+//             [postId, req.userId, content]
+//         );
+//         const [comment] = await db.query(
+//             'SELECT comments.*, users.username, users.look FROM comments JOIN users ON comments.user_id = users.id WHERE comments.id = ?',
+//             [result.insertId]
+//         );
+//         res.status(201).send(comment[0]);
+//     } catch (err) {
+//         console.error('Error adding comment:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour liker/disliker un post
-app.post('/likes', verifyToken, async (req, res) => {
-    const { postId, isLike } = req.body;
-    try {
-        const [existingLike] = await db.query(
-            'SELECT * FROM likes WHERE post_id = ? AND user_id = ?',
-            [postId, req.userId]
-        );
-
-        if (existingLike.length > 0) {
-            if (existingLike[0].is_like === isLike) {
-                // If the same like status is being sent, remove the like
-                await db.query(
-                    'DELETE FROM likes WHERE id = ?',
-                    [existingLike[0].id]
-                );
-            } else {
-                // Otherwise, update the like status
-                await db.query(
-                    'UPDATE likes SET is_like = ? WHERE id = ?',
-                    [isLike, existingLike[0].id]
-                );
-            }
-        } else {
-            await db.query(
-                'INSERT INTO likes (post_id, user_id, is_like) VALUES (?, ?, ?)',
-                [postId, req.userId, isLike]
-            );
-        }
-
-        const [[likeStatus]] = await db.query(
-            'SELECT is_like FROM likes WHERE post_id = ? AND user_id = ?',
-            [postId, req.userId]
-        );
-
-        const [[likesCount]] = await db.query(
-            'SELECT COUNT(*) AS likesCount FROM likes WHERE post_id = ? AND is_like = true',
-            [postId]
-        );
-
-        res.status(201).send({ userLike: likeStatus ? likeStatus.is_like : null, likesCount: likesCount.likesCount });
-    } catch (err) {
-        console.error('Error adding like/dislike:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.post('/likes', verifyToken, async (req, res) => {
+//     const { postId, isLike } = req.body;
+//     try {
+//         const [existingLike] = await db.query(
+//             'SELECT * FROM likes WHERE post_id = ? AND user_id = ?',
+//             [postId, req.userId]
+//         );
+//
+//         if (existingLike.length > 0) {
+//             if (existingLike[0].is_like === isLike) {
+//                 // If the same like status is being sent, remove the like
+//                 await db.query(
+//                     'DELETE FROM likes WHERE id = ?',
+//                     [existingLike[0].id]
+//                 );
+//             } else {
+//                 // Otherwise, update the like status
+//                 await db.query(
+//                     'UPDATE likes SET is_like = ? WHERE id = ?',
+//                     [isLike, existingLike[0].id]
+//                 );
+//             }
+//         } else {
+//             await db.query(
+//                 'INSERT INTO likes (post_id, user_id, is_like) VALUES (?, ?, ?)',
+//                 [postId, req.userId, isLike]
+//             );
+//         }
+//
+//         const [[likeStatus]] = await db.query(
+//             'SELECT is_like FROM likes WHERE post_id = ? AND user_id = ?',
+//             [postId, req.userId]
+//         );
+//
+//         const [[likesCount]] = await db.query(
+//             'SELECT COUNT(*) AS likesCount FROM likes WHERE post_id = ? AND is_like = true',
+//             [postId]
+//         );
+//
+//         res.status(201).send({ userLike: likeStatus ? likeStatus.is_like : null, likesCount: likesCount.likesCount });
+//     } catch (err) {
+//         console.error('Error adding like/dislike:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour récupérer les photos de l'utilisateur
 app.get('/user-photos', verifyToken, async (req, res) => {
@@ -1199,193 +1111,58 @@ app.get('/user-photos/:userId', verifyToken, async (req, res) => {
 });
 
 // Endpoint pour récupérer les posts de l'utilisateur
-app.get('/posts/:userId', verifyToken, async (req, res) => {
-    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
-    try {
-        const [posts] = await db.query(
-            `SELECT posts.*,
-                    users.username,
-                    users.look,
-                    COALESCE(likesCount.likesCount, 0)       as likesCount,
-                    COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-                    userLikes.is_like                        as userLike
-             FROM posts
-                      JOIN users ON posts.user_id = users.id
-                      LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
-                                 FROM likes
-                                 WHERE is_like = true
-                                 GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
-                      LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
-                                 FROM comments
-                                 GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
-                      LEFT JOIN (SELECT post_id, is_like
-                                 FROM likes
-                                 WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
-             WHERE posts.user_id = ?
-               AND posts.visibility = "public"
-             ORDER BY posts.created_at DESC`,
-            [req.userId, userId]
-        );
-
-        for (let post of posts) {
-            const [comments] = await db.query(
-                `SELECT comments.*, users.username, users.look
-                 FROM comments
-                          JOIN users ON comments.user_id = users.id
-                 WHERE comments.post_id = ?
-                 ORDER BY comments.created_at DESC`,
-                [post.id]
-            );
-            post.comments = comments;
-        }
-
-        res.status(200).send(posts);
-    } catch (err) {
-        console.error('Error fetching posts:', err);
-        res.status(500).send('Server error');
-    }
-});
-
-// Endpoint pour récupérer la liste des articles
-// app.get('/articles', async (req, res) => {
+// app.get('/posts/:userId', verifyToken, async (req, res) => {
+//     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
 //     try {
-//         const [articles] = await db.query('SELECT * FROM articles ORDER BY date DESC');
-//         res.status(200).send(articles);
-//     } catch (error) {
-//         console.error('Error fetching articles:', error);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Endpoint pour récupérer un article par ID
-// app.get('/articles/:id', verifyToken, async (req, res) => {
-//     const {id} = req.params;
-//     const userId = req.userId; // Assurez-vous que verifyToken est utilisé pour définir req.userId
-//     try {
-//         const [articles] = await db.query('SELECT * FROM articles WHERE id = ?', [id]);
-//         if (articles.length === 0) {
-//             return res.status(404).send('Article not found');
-//         }
-//
-//         const article = articles[0];
-//
-//         // Récupérer le nombre de likes
-//         const [[likesCount]] = await db.query(
-//             'SELECT COUNT(*) AS likesCount FROM article_likes WHERE article_id = ? AND is_like = true',
-//             [id]
+//         const [posts] = await db.query(
+//             `SELECT posts.*,
+//                     users.username,
+//                     users.look,
+//                     COALESCE(likesCount.likesCount, 0)       as likesCount,
+//                     COALESCE(commentsCount.commentsCount, 0) as commentsCount,
+//                     userLikes.is_like                        as userLike
+//              FROM posts
+//                       JOIN users ON posts.user_id = users.id
+//                       LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
+//                                  FROM likes
+//                                  WHERE is_like = true
+//                                  GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
+//                       LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
+//                                  FROM comments
+//                                  GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
+//                       LEFT JOIN (SELECT post_id, is_like
+//                                  FROM likes
+//                                  WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
+//              WHERE posts.user_id = ?
+//                AND posts.visibility = "public"
+//              ORDER BY posts.created_at DESC`,
+//             [req.userId, userId]
 //         );
 //
-//         // Récupérer le nombre de commentaires
-//         const [[commentsCount]] = await db.query(
-//             'SELECT COUNT(*) AS commentsCount FROM article_comments WHERE article_id = ?',
-//             [id]
-//         );
-//
-//         // Vérifier si l'utilisateur a liké l'article
-//         const [[userLike]] = await db.query(
-//             'SELECT is_like FROM article_likes WHERE article_id = ? AND user_id = ?',
-//             [id, userId]
-//         );
-//
-//         // Récupérer les commentaires
-//         const [comments] = await db.query(
-//             `SELECT article_comments.*, users.username, users.look
-//              FROM article_comments
-//                       JOIN users ON article_comments.user_id = users.id
-//              WHERE article_comments.article_id = ?
-//              ORDER BY article_comments.created_at DESC`,
-//             [id]
-//         );
-//
-//         article.likesCount = likesCount.likesCount;
-//         article.commentsCount = commentsCount.commentsCount;
-//         article.userLike = userLike ? userLike.is_like : null;
-//         article.comments = comments;
-//
-//         res.status(200).send(article);
-//     } catch (error) {
-//         console.error('Error fetching article:', error);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Endpoint for liking/disliking an article
-// app.post('/articles/:articleId/likes', verifyToken, async (req, res) => {
-//     const { articleId } = req.params;
-//     const { isLike } = req.body;
-//     try {
-//         const [existingLike] = await db.query(
-//             'SELECT * FROM article_likes WHERE article_id = ? AND user_id = ?',
-//             [articleId, req.userId]
-//         );
-//
-//         if (existingLike.length > 0) {
-//             await db.query(
-//                 'UPDATE article_likes SET is_like = ? WHERE id = ?',
-//                 [isLike, existingLike[0].id]
+//         for (let post of posts) {
+//             const [comments] = await db.query(
+//                 `SELECT comments.*, users.username, users.look
+//                  FROM comments
+//                           JOIN users ON comments.user_id = users.id
+//                  WHERE comments.post_id = ?
+//                  ORDER BY comments.created_at DESC`,
+//                 [post.id]
 //             );
-//         } else {
-//             await db.query(
-//                 'INSERT INTO article_likes (article_id, user_id, is_like) VALUES (?, ?, ?)',
-//                 [articleId, req.userId, isLike]
-//             );
+//             post.comments = comments;
 //         }
 //
-//         const [[likeStatus]] = await db.query(
-//             'SELECT is_like FROM article_likes WHERE article_id = ? AND user_id = ?',
-//             [articleId, req.userId]
-//         );
-//
-//         const [[likesCount]] = await db.query(
-//             'SELECT COUNT(*) AS likesCount FROM article_likes WHERE article_id = ? AND is_like = true',
-//             [articleId]
-//         );
-//
-//         res.status(201).send({ userLike: likeStatus.is_like, likesCount: likesCount.likesCount });
+//         res.status(200).send(posts);
 //     } catch (err) {
-//         console.error('Error adding like/dislike:', err);
+//         console.error('Error fetching posts:', err);
 //         res.status(500).send('Server error');
 //     }
 // });
 
-// Endpoint for commenting on an article
-// app.post('/articles/:articleId/comments', verifyToken, async (req, res) => {
-//     const { articleId } = req.params;
-//     const { content } = req.body;
-//
-//     try {
-//         const [[user]] = await db.query('SELECT last_comment_time FROM users WHERE id = ?', [req.userId]);
-//
-//         const currentTime = Math.floor(Date.now() / 1000);
-//
-//         if (user.last_comment_time && (currentTime - user.last_comment_time < 15)) {
-//             return res.status(429).send('You must wait 15 seconds before commenting again.');
-//         }
-//
-//         const [result] = await db.query(
-//             'INSERT INTO article_comments (article_id, user_id, content) VALUES (?, ?, ?)',
-//             [articleId, req.userId, content]
-//         );
-//
-//         await db.query('UPDATE users SET last_comment_time = ? WHERE id = ?', [currentTime, req.userId]);
-//
-//         const [comment] = await db.query(
-//             'SELECT article_comments.*, users.username, users.look FROM article_comments JOIN users ON article_comments.user_id = users.id WHERE article_comments.id = ?',
-//             [result.insertId]
-//         );
-//
-//         res.status(201).send(comment[0]);
-//     } catch (err) {
-//         console.error('Error adding comment:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Endpoint pour supprimer un commentaire d'article
-// app.delete('/article-comments/:commentId', verifyToken, async (req, res) => {
+// Endpoint pour supprimer un commentaire de post
+// app.delete('/comments/:commentId', verifyToken, async (req, res) => {
 //     const { commentId } = req.params;
 //     try {
-//         const [[comment]] = await db.query('SELECT user_id FROM article_comments WHERE id = ?', [commentId]);
+//         const [[comment]] = await db.query('SELECT user_id FROM comments WHERE id = ?', [commentId]);
 //         if (!comment) {
 //             return res.status(404).send('Comment not found');
 //         }
@@ -1395,118 +1172,10 @@ app.get('/posts/:userId', verifyToken, async (req, res) => {
 //             return res.status(403).send('Not authorized to delete this comment');
 //         }
 //
-//         await db.query('DELETE FROM article_comments WHERE id = ?', [commentId]);
+//         await db.query('DELETE FROM comments WHERE id = ?', [commentId]);
 //         res.status(200).send('Comment deleted successfully');
 //     } catch (err) {
 //         console.error('Error deleting comment:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Endpoint pour supprimer un commentaire d'article
-app.delete('/comments/:commentId', verifyToken, async (req, res) => {
-    const { commentId } = req.params;
-    try {
-        const [[comment]] = await db.query('SELECT user_id FROM comments WHERE id = ?', [commentId]);
-        if (!comment) {
-            return res.status(404).send('Comment not found');
-        }
-
-        const [[user]] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
-        if (user.rank < 5 && comment.user_id !== req.userId) {
-            return res.status(403).send('Not authorized to delete this comment');
-        }
-
-        await db.query('DELETE FROM comments WHERE id = ?', [commentId]);
-        res.status(200).send('Comment deleted successfully');
-    } catch (err) {
-        console.error('Error deleting comment:', err);
-        res.status(500).send('Server error');
-    }
-});
-
-// Endpoint for creating a new article
-// app.post('/articles', verifyToken, async (req, res) => {
-//     const { title, summary, content, image } = req.body;
-//     const userId = req.userId;
-//
-//     if (req.userRank < 5) {
-//         return res.status(403).send('Not authorized to create articles');
-//     }
-//
-//     try {
-//         const currentTimeUTC = moment.utc().format(); // ISO 8601 format with UTC timezone
-//         const [result] = await db.query(
-//             'INSERT INTO articles (title, summary, content, image, date, user_id) VALUES (?, ?, ?, ?, ?, ?)',
-//             [title, summary, content, image, currentTimeUTC, userId]
-//         );
-//         res.status(201).send({
-//             id: result.insertId,
-//             title,
-//             summary,
-//             content,
-//             image,
-//             date: currentTimeUTC,
-//             user_id: userId
-//         });
-//     } catch (err) {
-//         console.error('Error creating article:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Endpoint for updating an article
-// app.put('/articles/:id', verifyToken, async (req, res) => {
-//     const { id } = req.params;
-//     const { title, summary, content, image } = req.body;
-//     if (req.userRank < 5) {
-//         return res.status(403).send('Not authorized to edit articles');
-//     }
-//     try {
-//         await db.query(
-//             'UPDATE articles SET title = ?, summary = ?, content = ?, image = ? WHERE id = ?',
-//             [title, summary, content, image, id]
-//         );
-//         res.status(200).send('Article updated successfully');
-//     } catch (err) {
-//         console.error('Error updating article:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Endpoint for deleting an article
-// app.delete('/articles/:id', verifyToken, async (req, res) => {
-//     const { id } = req.params;
-//
-//     if (req.userRank < 5) {
-//         return res.status(403).send('Not authorized to delete articles');
-//     }
-//
-//     try {
-//         // Start a transaction
-//         await db.query('START TRANSACTION');
-//
-//         // Delete related comments
-//         await db.query('DELETE FROM article_comments WHERE article_id = ?', [id]);
-//
-//         // Delete related likes
-//         await db.query('DELETE FROM article_likes WHERE article_id = ?', [id]);
-//
-//         // Delete the article
-//         const [result] = await db.query('DELETE FROM articles WHERE id = ?', [id]);
-//
-//         if (result.affectedRows === 0) {
-//             await db.query('ROLLBACK');
-//             return res.status(404).send('Article not found');
-//         }
-//
-//         // Commit the transaction
-//         await db.query('COMMIT');
-//
-//         res.status(200).send('Article and related data deleted successfully');
-//     } catch (err) {
-//         await db.query('ROLLBACK');
-//         console.error('Error deleting article:', err);
 //         res.status(500).send('Server error');
 //     }
 // });
@@ -1541,6 +1210,8 @@ function verifyToken(req, res, next) {
 app.use('/auth', authRoutes);
 // routes pour les articles
 app.use('/articles', articleRoutes);
+// route pour les posts
+app.use('/posts', postRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
