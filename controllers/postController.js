@@ -230,7 +230,6 @@ exports.getPublicPosts = async (req, res) => {
     }
 };
 
-
 exports.createPost = async (req, res) => {
     const { content, image, video, visibility } = req.body;
 

@@ -205,36 +205,36 @@ app.post('/generate-credits', verifyToken, async (req, res) => {
 });
 
 // Servir les fichiers statiques
-app.use('/topstory', express.static(path.join(__dirname, 'topstory')));
+// app.use('/topstory', express.static(path.join(__dirname, 'topstory')));
 
 // Endpoint pour récupérer les images de la galerie
-app.get('/topstory', verifyToken, async (req, res) => {
-    try {
-        // Assurez-vous que l'utilisateur a le rang nécessaire
-        const [user] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
-        if (user.length === 0 || user[0].rank < 5) {
-            return res.status(403).send('Access denied');
-        }
-
-        const imagesDir = path.join(__dirname, 'topstory');
-        fs.readdir(imagesDir, (err, files) => {
-            if (err) {
-                console.error('Error reading images directory:', err);
-                return res.status(500).send('Server error');
-            }
-
-            const images = files.map(file => ({
-                name: file,
-                path: `/topstory/${file}`
-            }));
-
-            res.status(200).send(images);
-        });
-    } catch (error) {
-        console.error('Error fetching topstory images:', error);
-        res.status(500).send('Server error');
-    }
-});
+// app.get('/topstory', verifyToken, async (req, res) => {
+//     try {
+//         // Assurez-vous que l'utilisateur a le rang nécessaire
+//         const [user] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+//         if (user.length === 0 || user[0].rank < 5) {
+//             return res.status(403).send('Access denied');
+//         }
+//
+//         const imagesDir = path.join(__dirname, 'topstory');
+//         fs.readdir(imagesDir, (err, files) => {
+//             if (err) {
+//                 console.error('Error reading images directory:', err);
+//                 return res.status(500).send('Server error');
+//             }
+//
+//             const images = files.map(file => ({
+//                 name: file,
+//                 path: `/topstory/${file}`
+//             }));
+//
+//             res.status(200).send(images);
+//         });
+//     } catch (error) {
+//         console.error('Error fetching topstory images:', error);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour générer des pixels pour l'utilisateur
 app.post('/generate-pixels', verifyToken, async (req, res) => {
@@ -478,29 +478,6 @@ app.get('/check-2fa', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
-// Endpoint pour mettre à jour un post
-// app.put('/posts/:postId', verifyToken, async (req, res) => {
-//     const { postId } = req.params;
-//     const { content } = req.body;
-//
-//     try {
-//         const [result] = await db.query(
-//             'UPDATE posts SET content = ? WHERE id = ?',
-//             [content, postId]
-//         );
-//
-//         if (result.affectedRows === 0) {
-//             return res.status(404).send('Post not found');
-//         }
-//
-//         const [updatedPost] = await db.query('SELECT * FROM posts WHERE id = ?', [postId]);
-//         res.status(200).send(updatedPost[0]);
-//     } catch (err) {
-//         console.error('Error updating post:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
 
 // Endpoint pour activer Google Authenticator
 app.post('/enable-2fa', verifyToken, async (req, res) => {

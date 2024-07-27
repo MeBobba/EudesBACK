@@ -1,5 +1,7 @@
 const db = require("../db");
 const moment = require("moment-timezone");
+const path = require("path");
+const fs = require("fs");
 
 exports.getArticles = async (req, res) => {
     try {
@@ -232,6 +234,34 @@ exports.deleteArticle = async (req, res) => {
     } catch (err) {
         await db.query('ROLLBACK');
         console.error('Error deleting article:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.getTopStory = async (req, res) => {
+    try {
+        // Assurez-vous que l'utilisateur a le rang nécessaire
+        const [user] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
+        if (user.length === 0 || user[0].rank < 5) {
+            return res.status(403).send('Access denied');
+        }
+
+        const imagesDir = path.join(__dirname, '../topstory');
+        fs.readdir(imagesDir, (err, files) => {
+            if (err) {
+                console.error('Error reading images directory:', err);
+                return res.status(500).send('Server error');
+            }
+
+            const images = files.map(file => ({
+                name: file,
+                path: `/articles/topstory/${file}`
+            }));
+
+            res.status(200).send(images);
+        });
+    } catch (error) {
+        console.error('Error fetching topstory images:', error);
         res.status(500).send('Server error');
     }
 };
