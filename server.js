@@ -97,11 +97,11 @@ app.get('/user/wallet', verifyToken, async (req, res) => {
     }
 });
 
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-access-token');
-    next();
-});
+// app.use((req, res, next) => {
+//     res.header('Access-Control-Allow-Origin', '*');
+//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-access-token');
+//     next();
+// });
 
 // Endpoint pour vérifier l'existence d'une piste
 app.get('/tracks/:spotifyId', async (req, res) => {
