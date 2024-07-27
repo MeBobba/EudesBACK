@@ -31,7 +31,12 @@ const fs = require('fs');
 const path = require('path');
 
 app.use(bodyParser.json());
-app.use(cors());
+// CORS frontend
+app.use(cors({
+    origin: process.env.FRONTEND_URL,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "x-access-token"]
+}));
 
 app.use((req, res, next) => {
     req.setTimeout(0); // Désactive le timeout pour chaque requête
