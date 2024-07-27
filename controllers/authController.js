@@ -1,6 +1,6 @@
 const db = require("../db");
 const bcrypt = require("bcryptjs");
-const speakeasy = require("speakeasy");
+const twofactor = require("node-2fa");
 const jwt = require("jsonwebtoken");
 const {getClientIp, checkBan} = require("../utils");
 
@@ -43,12 +43,7 @@ exports.login = async (req, res) => {
 
         // Vérifier le token 2FA si activé
         if (user.is_2fa_enabled) {
-            const verified = speakeasy.totp.verify({
-                secret: user.google_auth_secret,
-                encoding: 'base32',
-                token: token2fa,
-                window: 1 // Permet une légère dérive temporelle
-            });
+            const verified = twofactor.verifyToken(user.google_auth_secret, token2fa);
             if (!verified) {
                 return res.status(401).send('Invalid 2FA token');
             }

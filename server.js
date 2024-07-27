@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const speakeasy = require('speakeasy');
+const twofactor = require("node-2fa");
 const qrcode = require('qrcode');
 require('dotenv').config();
 const db = require('./db');
@@ -203,38 +203,6 @@ app.post('/generate-credits', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
-// Servir les fichiers statiques
-// app.use('/topstory', express.static(path.join(__dirname, 'topstory')));
-
-// Endpoint pour récupérer les images de la galerie
-// app.get('/topstory', verifyToken, async (req, res) => {
-//     try {
-//         // Assurez-vous que l'utilisateur a le rang nécessaire
-//         const [user] = await db.query('SELECT rank FROM users WHERE id = ?', [req.userId]);
-//         if (user.length === 0 || user[0].rank < 5) {
-//             return res.status(403).send('Access denied');
-//         }
-//
-//         const imagesDir = path.join(__dirname, 'topstory');
-//         fs.readdir(imagesDir, (err, files) => {
-//             if (err) {
-//                 console.error('Error reading images directory:', err);
-//                 return res.status(500).send('Server error');
-//             }
-//
-//             const images = files.map(file => ({
-//                 name: file,
-//                 path: `/topstory/${file}`
-//             }));
-//
-//             res.status(200).send(images);
-//         });
-//     } catch (error) {
-//         console.error('Error fetching topstory images:', error);
-//         res.status(500).send('Server error');
-//     }
-// });
 
 // Endpoint pour générer des pixels pour l'utilisateur
 app.post('/generate-pixels', verifyToken, async (req, res) => {
@@ -481,17 +449,15 @@ app.get('/check-2fa', async (req, res) => {
 
 // Endpoint pour activer Google Authenticator
 app.post('/enable-2fa', verifyToken, async (req, res) => {
-    const secret = speakeasy.generateSecret({ length: 20 });
-    const url = speakeasy.otpauthURL({
-        secret: secret.base32,
-        label: 'MeBobba',
-        issuer: 'Eudes'
-    });
+    const [results] = await db.query('SELECT username FROM users WHERE id = ?', [req.userId]);
+    const username = results[0].username;
+
+    const { secret, uri} = twofactor.generateSecret({ name: 'MeBobba', account: username });
 
     try {
-        await db.query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret.base32, req.userId]);
-        qrcode.toDataURL(url, (err, data_url) => {
-            res.status(200).send({ secret: secret.base32, dataURL: data_url });
+        await db.query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret, req.userId]);
+        qrcode.toDataURL(uri, (err, data_url) => {
+            res.status(200).send({ secret: secret, dataURL: data_url });
         });
     } catch (err) {
         console.error('Error enabling 2FA:', err);
@@ -505,12 +471,7 @@ app.post('/verify-2fa', verifyToken, async (req, res) => {
     try {
         const [results] = await db.query('SELECT google_auth_secret FROM users WHERE id = ?', [req.userId]);
         const user = results[0];
-        const verified = speakeasy.totp.verify({
-            secret: user.google_auth_secret,
-            encoding: 'base32',
-            token,
-            window: 1 // Allow some time drift
-        });
+        const verified = twofactor.verifyToken(user.google_auth_secret, token);
         if (verified) {
             await db.query('UPDATE users SET is_2fa_enabled = 1 WHERE id = ?', [req.userId]);
             res.status(200).send('2FA enabled successfully');
