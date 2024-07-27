@@ -14,6 +14,7 @@ const postRoutes = require('./routes/postRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const shopRoutes = require('./routes/shopRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -548,33 +549,33 @@ app.get('/user-photos', verifyToken, async (req, res) => {
 });
 
 // Route pour récupérer le profil de l'utilisateur courant
-app.get('/profile/me', verifyToken, async (req, res) => {
-    try {
-        const [results] = await db.query('SELECT * FROM users WHERE id = ?', [req.userId]);
-        if (results.length === 0) {
-            return res.status(404).send('User not found');
-        }
-        res.status(200).send(results[0]);
-    } catch (err) {
-        console.error('Error fetching user profile:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.get('/profile/me', verifyToken, async (req, res) => {
+//     try {
+//         const [results] = await db.query('SELECT * FROM users WHERE id = ?', [req.userId]);
+//         if (results.length === 0) {
+//             return res.status(404).send('User not found');
+//         }
+//         res.status(200).send(results[0]);
+//     } catch (err) {
+//         console.error('Error fetching user profile:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Route pour récupérer le profil d'un utilisateur par ID
-app.get('/profile/:userId', verifyToken, async (req, res) => {
-    const { userId } = req.params;
-    try {
-        const [users] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-        if (users.length === 0) {
-            return res.status(404).send('User not found');
-        }
-        res.status(200).send(users[0]);
-    } catch (err) {
-        console.error('Error fetching user profile:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.get('/profile/:userId', verifyToken, async (req, res) => {
+//     const { userId } = req.params;
+//     try {
+//         const [users] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+//         if (users.length === 0) {
+//             return res.status(404).send('User not found');
+//         }
+//         res.status(200).send(users[0]);
+//     } catch (err) {
+//         console.error('Error fetching user profile:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Ajout de la route pour la recherche d'utilisateurs
 app.get('/search-users', verifyToken, async (req, res) => {
@@ -656,6 +657,8 @@ app.use('/games', gameRoutes);
 app.use('/shop', shopRoutes);
 // routes pour le paiement
 app.use('/payment', paymentRoutes);
+// routes pour les utilisateurs
+app.use('/users', userRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
