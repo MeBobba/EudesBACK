@@ -480,27 +480,27 @@ app.get('/check-2fa', async (req, res) => {
 });
 
 // Endpoint pour mettre à jour un post
-app.put('/posts/:postId', verifyToken, async (req, res) => {
-    const { postId } = req.params;
-    const { content } = req.body;
-
-    try {
-        const [result] = await db.query(
-            'UPDATE posts SET content = ? WHERE id = ?',
-            [content, postId]
-        );
-
-        if (result.affectedRows === 0) {
-            return res.status(404).send('Post not found');
-        }
-
-        const [updatedPost] = await db.query('SELECT * FROM posts WHERE id = ?', [postId]);
-        res.status(200).send(updatedPost[0]);
-    } catch (err) {
-        console.error('Error updating post:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.put('/posts/:postId', verifyToken, async (req, res) => {
+//     const { postId } = req.params;
+//     const { content } = req.body;
+//
+//     try {
+//         const [result] = await db.query(
+//             'UPDATE posts SET content = ? WHERE id = ?',
+//             [content, postId]
+//         );
+//
+//         if (result.affectedRows === 0) {
+//             return res.status(404).send('Post not found');
+//         }
+//
+//         const [updatedPost] = await db.query('SELECT * FROM posts WHERE id = ?', [postId]);
+//         res.status(200).send(updatedPost[0]);
+//     } catch (err) {
+//         console.error('Error updating post:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour activer Google Authenticator
 app.post('/enable-2fa', verifyToken, async (req, res) => {

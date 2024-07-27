@@ -172,6 +172,7 @@ exports.deletePost = async (req, res) => {
 exports.getPublicPosts = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
+
     try {
         const [posts] = await db.query(
             `SELECT DISTINCT posts.*,
@@ -179,7 +180,7 @@ exports.getPublicPosts = async (req, res) => {
                              users.look,
                              COALESCE(likesCount.likesCount, 0)       as likesCount,
                              COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-                             userLikes.is_like                        as userLike
+                             COALESCE(userLikes.is_like, false)       as userLike
              FROM posts
                       JOIN users ON posts.user_id = users.id
                       LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
@@ -192,22 +193,34 @@ exports.getPublicPosts = async (req, res) => {
                       LEFT JOIN (SELECT post_id, is_like
                                  FROM likes
                                  WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
-             WHERE posts.visibility = 'public'
+             WHERE posts.visibility = 'public' AND posts.user_id != ?
              ORDER BY posts.created_at DESC LIMIT ?
              OFFSET ?`,
-            [req.userId, parseInt(limit), parseInt(offset)]
+            [req.userId, req.userId, parseInt(limit), parseInt(offset)]
         );
 
-        for (let post of posts) {
+        const postIds = posts.map(post => post.id);
+        if (postIds.length > 0) {
             const [comments] = await db.query(
-                `SELECT comments.*, users.username, users.look
+                `SELECT comments.*, users.username, users.look, comments.post_id
                  FROM comments
                           JOIN users ON comments.user_id = users.id
-                 WHERE comments.post_id = ?
+                 WHERE comments.post_id IN (?)
                  ORDER BY comments.created_at DESC`,
-                [post.id]
+                [postIds]
             );
-            post.comments = comments;
+
+            const commentsByPostId = comments.reduce((acc, comment) => {
+                if (!acc[comment.post_id]) {
+                    acc[comment.post_id] = [];
+                }
+                acc[comment.post_id].push(comment);
+                return acc;
+            }, {});
+
+            posts.forEach(post => {
+                post.comments = commentsByPostId[post.id] || [];
+            });
         }
 
         res.status(200).send(posts);
@@ -215,7 +228,8 @@ exports.getPublicPosts = async (req, res) => {
         console.error('Error fetching public posts:', err);
         res.status(500).send('Server error');
     }
-}
+};
+
 
 exports.createPost = async (req, res) => {
     const { content, image, video, visibility } = req.body;
@@ -255,6 +269,28 @@ exports.createPost = async (req, res) => {
         res.status(201).send(newPost[0]);
     } catch (err) {
         console.error('Error creating post:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.editPost = async (req, res) => {
+    const { postId } = req.params;
+    const { content } = req.body;
+
+    try {
+        const [result] = await db.query(
+            'UPDATE posts SET content = ? WHERE id = ?',
+            [content, postId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).send('Post not found');
+        }
+
+        const [updatedPost] = await db.query('SELECT * FROM posts WHERE id = ?', [postId]);
+        res.status(200).send(updatedPost[0]);
+    } catch (err) {
+        console.error('Error updating post:', err);
         res.status(500).send('Server error');
     }
 };
