@@ -330,18 +330,18 @@ app.get('/anti-robot-question', (req, res) => {
 });
 
 // Endpoint pour télécharger les données de l'utilisateur
-app.get('/download-data', verifyToken, async (req, res) => {
-    try {
-        const [results] = await db.query('SELECT * FROM users WHERE id = ?', [req.userId]);
-        if (results.length === 0) {
-            return res.status(404).send('User not found');
-        }
-        res.status(200).json(results[0]);
-    } catch (err) {
-        console.error('Error downloading user data:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.get('/download-data', verifyToken, async (req, res) => {
+//     try {
+//         const [results] = await db.query('SELECT * FROM users WHERE id = ?', [req.userId]);
+//         if (results.length === 0) {
+//             return res.status(404).send('User not found');
+//         }
+//         res.status(200).json(results[0]);
+//     } catch (err) {
+//         console.error('Error downloading user data:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour supprimer le compte de l'utilisateur
 app.delete('/delete-account', verifyToken, async (req, res) => {
@@ -535,18 +535,19 @@ app.get('/lyrics', async (req, res) => {
 // });
 
 // Endpoint pour récupérer les photos de l'utilisateur
-app.get('/user-photos', verifyToken, async (req, res) => {
-    try {
-        const [photos] = await db.query(
-            'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
-            [req.userId]
-        );
-        res.status(200).send(photos);
-    } catch (err) {
-        console.error('Error fetching user photos:', err);
-        res.status(500).send('Server error');
-    }
-});
+// todo: enlever car ça sert à rien le /users/photos le fait déjà
+// app.get('/user-photos', verifyToken, async (req, res) => {
+//     try {
+//         const [photos] = await db.query(
+//             'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
+//             [req.userId]
+//         );
+//         res.status(200).send(photos);
+//     } catch (err) {
+//         console.error('Error fetching user photos:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Route pour récupérer le profil de l'utilisateur courant
 // app.get('/profile/me', verifyToken, async (req, res) => {
