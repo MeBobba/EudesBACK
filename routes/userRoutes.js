@@ -5,5 +5,6 @@ const userController = require("../controllers/userController");
 
 router.get('/profile/me', verifyToken, userController.getMyProfile);
 router.get('/profile/:userId', verifyToken, userController.getUserProfile);
+router.get('/photos/:userId', verifyToken, userController.getUserPhotos);
 
 module.exports = router;

@@ -590,34 +590,35 @@ app.get('/search-users', verifyToken, async (req, res) => {
 });
 
 // Tableau de bord utilisateur
-app.get('/dashboard/:userId', verifyToken, async (req, res) => {
-    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
-    try {
-        const [results] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-        if (results.length === 0) {
-            return res.status(404).send('User not found');
-        }
-        res.status(200).send(results[0]);
-    } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        res.status(500).send('Server error');
-    }
-});
+// todo: à quoi ça sert ?? c'est pas sur le front
+// app.get('/dashboard/:userId', verifyToken, async (req, res) => {
+//     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+//     try {
+//         const [results] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+//         if (results.length === 0) {
+//             return res.status(404).send('User not found');
+//         }
+//         res.status(200).send(results[0]);
+//     } catch (err) {
+//         console.error('Error fetching dashboard data:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour récupérer les photos de l'utilisateur
-app.get('/user-photos/:userId', verifyToken, async (req, res) => {
-    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
-    try {
-        const [photos] = await db.query(
-            'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
-            [userId]
-        );
-        res.status(200).send(photos);
-    } catch (err) {
-        console.error('Error fetching user photos:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.get('/user-photos/:userId', verifyToken, async (req, res) => {
+//     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+//     try {
+//         const [photos] = await db.query(
+//             'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
+//             [userId]
+//         );
+//         res.status(200).send(photos);
+//     } catch (err) {
+//         console.error('Error fetching user photos:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Middleware de vérification du token
 function verifyToken(req, res, next) {

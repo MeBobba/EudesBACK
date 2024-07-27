@@ -26,3 +26,17 @@ exports.getUserProfile = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+
+exports.getUserPhotos = async (req, res) => {
+    const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
+    try {
+        const [photos] = await db.query(
+            'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
+            [userId]
+        );
+        res.status(200).send(photos);
+    } catch (err) {
+        console.error('Error fetching user photos:', err);
+        res.status(500).send('Server error');
+    }
+};
