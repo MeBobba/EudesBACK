@@ -7,5 +7,7 @@ router.get('/profile/me', verifyToken, userController.getMyProfile);
 router.get('/profile/:userId', verifyToken, userController.getUserProfile);
 router.get('/photos/:userId', verifyToken, userController.getUserPhotos);
 router.get('/download-data', verifyToken, userController.downloadUserData);
+// router.put('/update-account', verifyToken, userController.updateAccount);
+router.delete('/delete-account', verifyToken, userController.deleteAccount);
 
 module.exports = router;
