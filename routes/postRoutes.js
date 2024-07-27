@@ -4,6 +4,7 @@ const {verifyToken} = require("../middlewares/authMiddleware");
 const postController = require("../controllers/postController");
 
 router.get('/public', verifyToken, postController.getPublicPosts);
+router.get('/wordfilter', verifyToken, postController.getWordFilter);
 router.get('/:userId', verifyToken, postController.getPostsForUser);
 router.post('/', verifyToken, postController.createPost);
 router.post('/likes', verifyToken, postController.addLike);

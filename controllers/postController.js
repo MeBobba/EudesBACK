@@ -293,3 +293,13 @@ exports.editPost = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+
+exports.getWordFilter = async (req, res) => {
+    try {
+        const [filters] = await db.query('SELECT * FROM wordfilter');
+        res.status(200).send(filters);
+    } catch (err) {
+        console.error('Error fetching word filters:', err);
+        res.status(500).send('Server error');
+    }
+};

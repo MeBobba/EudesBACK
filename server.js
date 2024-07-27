@@ -97,12 +97,6 @@ app.get('/user/wallet', verifyToken, async (req, res) => {
     }
 });
 
-// app.use((req, res, next) => {
-//     res.header('Access-Control-Allow-Origin', '*');
-//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-access-token');
-//     next();
-// });
-
 // Endpoint pour vérifier l'existence d'une piste
 app.get('/tracks/:spotifyId', async (req, res) => {
     const spotifyId = req.params.spotifyId;
@@ -138,15 +132,15 @@ app.post('/tracks', async (req, res) => {
 });
 
 // Endpoint pour les filtres de mots
-app.get('/wordfilter', verifyToken, async (req, res) => {
-    try {
-        const [filters] = await db.query('SELECT * FROM wordfilter');
-        res.status(200).send(filters);
-    } catch (err) {
-        console.error('Error fetching word filters:', err);
-        res.status(500).send('Server error');
-    }
-});
+// app.get('/wordfilter', verifyToken, async (req, res) => {
+//     try {
+//         const [filters] = await db.query('SELECT * FROM wordfilter');
+//         res.status(200).send(filters);
+//     } catch (err) {
+//         console.error('Error fetching word filters:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // Endpoint pour les histoires utilisateur (user stories)
 app.get('/stories/:userId', verifyToken, async (req, res) => {
@@ -281,7 +275,7 @@ app.post('/disable-2fa', verifyToken, async (req, res) => {
 });
 
 // Tableau de bord utilisateur
-app.get('/dashboard', verifyToken, async (req, res) => {
+app.get('/dashboard', verifyToken, async (req, res) =>  {
     try {
         const [results] = await db.query('SELECT * FROM users WHERE id = ?', [req.userId]);
         if (results.length === 0) {
