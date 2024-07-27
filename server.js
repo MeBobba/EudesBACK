@@ -14,6 +14,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const authRoutes = require('./routes/authRoutes');
 const articleRoutes = require('./routes/articleRoutes');
 const postRoutes = require('./routes/postRoutes');
+const gameRoutes = require('./routes/gameRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -843,31 +844,6 @@ app.get('/profile/me', verifyToken, async (req, res) => {
     }
 });
 
-// Endpoint pour récupérer les jeux
-app.get('/games', async (req, res) => {
-    try {
-        const [games] = await db.query('SELECT * FROM games');
-        res.status(200).send(games);
-    } catch (error) {
-        console.error('Error fetching games:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Endpoint pour récupérer les jeux par ID
-app.get('/games/:id', async (req, res) => {
-    try {
-        const [games] = await db.query('SELECT * FROM games WHERE id = ?', [req.params.id]);
-        if (games.length === 0) {
-            return res.status(404).send('Game not found');
-        }
-        res.status(200).send(games[0]);
-    } catch (error) {
-        console.error('Error fetching game by ID:', error);
-        res.status(500).send('Server error');
-    }
-});
-
 // Route pour récupérer le profil d'un utilisateur par ID
 app.get('/profile/:userId', verifyToken, async (req, res) => {
     const { userId } = req.params;
@@ -957,6 +933,8 @@ app.use('/auth', authRoutes);
 app.use('/articles', articleRoutes);
 // route pour les posts
 app.use('/posts', postRoutes);
+// routes pour les jeux
+app.use('/games', gameRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
