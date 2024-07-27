@@ -1,7 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const twofactor = require("node-2fa");
 const qrcode = require('qrcode');
@@ -9,13 +8,12 @@ require('dotenv').config();
 const db = require('./db');
 const http = require('http');
 const socketIo = require('socket.io');
-const moment = require('moment-timezone');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const authRoutes = require('./routes/authRoutes');
 const articleRoutes = require('./routes/articleRoutes');
 const postRoutes = require('./routes/postRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const shopRoutes = require('./routes/shopRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -34,98 +32,10 @@ const path = require('path');
 
 app.use(bodyParser.json());
 app.use(cors());
-app.use('/webhook', bodyParser.raw({ type: 'application/json' }));
 
 app.use((req, res, next) => {
     req.setTimeout(0); // Désactive le timeout pour chaque requête
     next();
-});
-
-app.post('/create-checkout-session', verifyToken, async (req, res) => {
-    const { packageId } = req.body;
-
-    // Définir les packages de jetons et leurs prix
-    const tokenPackages = {
-        1: { name: 'Small Package', amount: 100, price: 500 },  // prix en centimes
-        2: { name: 'Medium Package', amount: 500, price: 2000 }, // prix en centimes
-        3: { name: 'Large Package', amount: 1000, price: 3500 }  // prix en centimes
-    };
-
-    const selectedPackage = tokenPackages[packageId];
-    if (!selectedPackage) {
-        return res.status(400).send('Invalid package ID');
-    }
-
-    try {
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: [
-                {
-                    price_data: {
-                        currency: 'eur',
-                        product_data: {
-                            name: selectedPackage.name,
-                        },
-                        unit_amount: selectedPackage.price,
-                    },
-                    quantity: 1,
-                },
-            ],
-            mode: 'payment',
-            success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.FRONTEND_URL}/cancel`,
-            metadata: {
-                userId: req.userId,
-                packageId: packageId
-            }
-        });
-
-        res.status(200).send({ url: session.url });
-    } catch (error) {
-        console.error('Error creating Stripe checkout session:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-app.post('/webhook', bodyParser.raw({ type: 'application/json' }), (req, res) => {
-    const sig = req.headers['stripe-signature'];
-
-    let event;
-    try {
-        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    } catch (err) {
-        console.error('Webhook signature verification failed:', err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-
-        const userId = session.metadata.userId;
-        const packageId = session.metadata.packageId;
-
-        // Définir les packages de jetons et leurs montants
-        const tokenPackages = {
-            1: { name: 'Small Package', amount: 100 },
-            2: { name: 'Medium Package', amount: 500 },
-            3: { name: 'Large Package', amount: 1000 }
-        };
-
-        const selectedPackage = tokenPackages[packageId];
-
-        if (selectedPackage) {
-            // Ajouter les jetons à l'utilisateur dans la base de données
-            db.query('UPDATE users SET points = points + ? WHERE id = ?', [selectedPackage.amount, userId], (err, result) => {
-                if (err) {
-                    console.error('Error updating user tokens:', err);
-                } else {
-                    console.log(`Added ${selectedPackage.amount} tokens to user ID ${userId}`);
-                }
-            });
-        }
-    }
-
-    res.status(200).send('Received webhook');
 });
 
 // Endpoint pour mettre à jour les informations d'un utilisateur
@@ -181,50 +91,6 @@ app.get('/user/wallet', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
-// Endpoint pour générer des crédits pour l'utilisateur
-// app.post('/generate-credits', verifyToken, async (req, res) => {
-//     try {
-//         const [results] = await db.query('SELECT credits FROM users WHERE id = ?', [req.userId]);
-//         if (results.length === 0) {
-//             return res.status(404).send('User not found');
-//         }
-//
-//         const userCredits = results[0].credits;
-//         if (userCredits < 10000) {
-//             const newCredits = userCredits + 10000;
-//             await db.query('UPDATE users SET credits = ? WHERE id = ?', [newCredits, req.userId]);
-//             res.status(200).send({ generatedCredits: 10000 });
-//         } else {
-//             res.status(400).send('You have enough credits.');
-//         }
-//     } catch (error) {
-//         console.error('Error generating credits:', error);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Endpoint pour générer des pixels pour l'utilisateur
-// app.post('/generate-pixels', verifyToken, async (req, res) => {
-//     try {
-//         const [results] = await db.query('SELECT pixels FROM users WHERE id = ?', [req.userId]);
-//         if (results.length === 0) {
-//             return res.status(404).send('User not found');
-//         }
-//
-//         const userPixels = results[0].pixels;
-//         if (userPixels < 10000) {
-//             const newPixels = userPixels + 10000;
-//             await db.query('UPDATE users SET pixels = ? WHERE id = ?', [newPixels, req.userId]);
-//             res.status(200).send({ generatedPixels: 10000 });
-//         } else {
-//             res.status(400).send('You have enough pixels.');
-//         }
-//     } catch (error) {
-//         console.error('Error generating pixels:', error);
-//         res.status(500).send('Server error');
-//     }
-// });
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -288,95 +154,6 @@ app.get('/stories/:userId', verifyToken, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
-// Fonctions pour la loterie
-// function drawLotteryNumbers(betAmount, selectedNumbers) {
-//     const numbers = Array.from({ length: 49 }, (_, i) => i + 1);
-//     const drawnNumbers = [];
-//     const chanceFactor = Math.min((betAmount - 150) / (1000 - 150), 0.7); // Facteur de chance limité à 0.7
-//
-//     for (let i = 0; i < 6; i++) {
-//         let index;
-//         if (Math.random() < chanceFactor) {
-//             // Sélectionner un nombre parmi ceux choisis par l'utilisateur avec une probabilité accrue
-//             const commonNumbers = selectedNumbers.filter(num => numbers.includes(num));
-//             index = numbers.indexOf(commonNumbers[Math.floor(Math.random() * commonNumbers.length)]);
-//         } else {
-//             // Sélectionner un nombre aléatoire parmi les nombres restants
-//             index = Math.floor(Math.random() * numbers.length);
-//         }
-//         drawnNumbers.push(numbers.splice(index, 1)[0]);
-//     }
-//     return drawnNumbers;
-// }
-//
-// function checkWin(selectedNumbers, drawnNumbers, betAmount) {
-//     const matches = selectedNumbers.filter(number => drawnNumbers.includes(number)).length;
-//     if (matches === 6) {
-//         const baseMultipliers = [0, 0, 0.5, 1, 2, 5, 10]; // Multiplicateurs de base pour 0 à 6 correspondances
-//         const chanceFactor = Math.min((betAmount - 150) / (1000 - 150), 0.7); // Facteur de chance limité à 0.7
-//         const adjustedMultipliers = baseMultipliers.map(multiplier => multiplier * (1 + chanceFactor));
-//         return adjustedMultipliers[matches];
-//     }
-//     return 0; // Si tous les numéros ne correspondent pas, retourne 0
-// }
-
-// Endpoint pour jouer à la loterie
-// app.post('/lottery', verifyToken, async (req, res) => {
-//     const { selectedNumbers, betAmount } = req.body;
-//     if (!Array.isArray(selectedNumbers) || selectedNumbers.length !== 6) {
-//         return res.status(400).send('Invalid input');
-//     }
-//     if (betAmount < 150 || betAmount > 1000) {
-//         return res.status(400).send('Bet amount must be between 150 and 1000 points.');
-//     }
-//
-//     try {
-//         const [user] = await db.query('SELECT points FROM users WHERE id = ?', [req.userId]);
-//         if (user[0].points < betAmount) {
-//             return res.status(400).send({ success: false, message: 'You do not have enough points to play.' });
-//         }
-//
-//         const drawnNumbers = drawLotteryNumbers(betAmount, selectedNumbers);
-//         const multiplier = checkWin(selectedNumbers, drawnNumbers, betAmount); // Utilisation de la nouvelle fonction
-//         const rewardAmount = betAmount * multiplier;
-//
-//         await db.query('UPDATE users SET points = points - ? WHERE id = ?', [betAmount, req.userId]);
-//
-//         if (rewardAmount > 0) {
-//             await db.query('UPDATE users SET points = points + ? WHERE id = ?', [rewardAmount, req.userId]);
-//         }
-//
-//         await db.query(
-//             'INSERT INTO lottery_plays (user_id, bet_amount, reward_amount, reward_type, drawn_numbers) VALUES (?, ?, ?, ?, ?)',
-//             [req.userId, betAmount, rewardAmount, 'Points', drawnNumbers.join(',')]
-//         );
-//
-//         res.status(200).send({ success: true, drawnNumbers, reward: { amount: rewardAmount, type: 'Points' } });
-//     } catch (error) {
-//         console.error('Error processing lottery:', error);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// app.get('/last-members', async (req, res) => {
-//     try {
-//         const [results] = await db.query(
-//             `SELECT u.username,
-//                     l.bet_amount                           AS betAmount,
-//                     l.reward_amount                        AS rewardAmount,
-//                     l.reward_type                          AS rewardType,
-//                     (l.reward_amount / l.bet_amount * 100) AS probability
-//              FROM lottery_plays l
-//                       JOIN users u ON l.user_id = u.id
-//              ORDER BY l.created_at DESC LIMIT 10`
-//         );
-//         res.status(200).send(results);
-//     } catch (error) {
-//         console.error('Error fetching last members:', error);
-//         res.status(500).send('Server error');
-//     }
-// });
 
 app.get('/user/points', verifyToken, async (req, res) => {
     try {
@@ -878,6 +655,8 @@ app.use('/posts', postRoutes);
 app.use('/games', gameRoutes);
 // routes pour la boutique
 app.use('/shop', shopRoutes);
+// routes pour le paiement
+app.use('/payment', paymentRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
