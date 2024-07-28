@@ -1,0 +1,1918 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "MeBobba API",
+    "description": "Documentation pour l'API de MeBobba",
+    "version": "1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Server"
+    },
+    {
+      "url": "https://api.mebobba.com",
+      "description": "Prod Server"
+    }
+  ],
+  "paths": {
+    "/topstory": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      },
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Créé"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "429": {
+            "description": "Trop de Requêtes"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "example": "any"
+                  },
+                  "summary": {
+                    "example": "any"
+                  },
+                  "content": {
+                    "example": "any"
+                  },
+                  "image": {
+                    "example": "any"
+                  },
+                  "icon": {
+                    "example": "any"
+                  },
+                  "source": {
+                    "example": "any"
+                  },
+                  "video": {
+                    "example": "any"
+                  },
+                  "visibility": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{id}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      },
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      },
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "example": "any"
+                  },
+                  "summary": {
+                    "example": "any"
+                  },
+                  "content": {
+                    "example": "any"
+                  },
+                  "image": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{articleId}/likes": {
+      "post": {
+        "tags": [
+          "Articles"
+        ],
+        "description": "",
+        "parameters": [
+          {
+            "name": "articleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Créé"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isLike": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{articleId}/comments": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "articleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Créé"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "429": {
+            "description": "Trop de Requêtes"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{articleId}/comments/{commentId}": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "articleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Mauvaise Requête"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "example": "any"
+                  },
+                  "password": {
+                    "example": "any"
+                  },
+                  "token2fa": {
+                    "example": "any"
+                  },
+                  "machine_id": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logout": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/register": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "example": "any"
+                  },
+                  "password": {
+                    "example": "any"
+                  },
+                  "mail": {
+                    "example": "any"
+                  },
+                  "machine_id": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check-session": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/anti-robot-question": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/check-ban": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "machine-id",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/lyrics": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q_track",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q_artist",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/tracks/{spotifyId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "spotifyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/tracks": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Créé"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "example": "any"
+                  },
+                  "album_id": {
+                    "example": "any"
+                  },
+                  "duration": {
+                    "example": "any"
+                  },
+                  "spotify_popularity": {
+                    "example": "any"
+                  },
+                  "spotify_id": {
+                    "example": "any"
+                  },
+                  "description": {
+                    "example": "any"
+                  },
+                  "image": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/create-checkout-session": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Mauvaise Requête"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "packageId": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhook": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "stripe-signature",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Mauvaise Requête"
+          }
+        }
+      }
+    },
+    "/public": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/wordfilter": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/{userId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      },
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rank": {
+                    "example": "any"
+                  },
+                  "mail": {
+                    "example": "any"
+                  },
+                  "motto": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/likes": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Créé"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "postId": {
+                    "example": "any"
+                  },
+                  "isLike": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/comments": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Créé"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "postId": {
+                    "example": "any"
+                  },
+                  "content": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/comments/{commentId}": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/{postId}": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      },
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/last-members": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/generate-credits": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Mauvaise Requête"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/generate-pixels": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Mauvaise Requête"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/lottery": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Mauvaise Requête"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "selectedNumbers": {
+                    "example": "any"
+                  },
+                  "betAmount": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/update-account": {
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "example": "any"
+                  },
+                  "real_name": {
+                    "example": "any"
+                  },
+                  "mail": {
+                    "example": "any"
+                  },
+                  "motto": {
+                    "example": "any"
+                  },
+                  "look": {
+                    "example": "any"
+                  },
+                  "gender": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/me": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/profile/{userId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/photos/{userId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/stories/{userId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/download-data": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/points": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/wallet": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/check-2fa": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Non Trouvé"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/delete-account": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/check-username": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check-email": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verify-2fa": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Mauvaise Requête"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/enable-2fa": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    },
+    "/disable-2fa": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-access-token",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Non Autorisé"
+          },
+          "403": {
+            "description": "Interdit"
+          },
+          "500": {
+            "description": "Erreur Interne du Serveur"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "apiKey",
+        "name": "x-access-token",
+        "in": "header"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

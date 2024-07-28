@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 require('dotenv').config();
 const http = require('http');
+const swaggerUi = require("swagger-ui-express");
 const authRoutes = require('./routes/authRoutes');
 const articleRoutes = require('./routes/articleRoutes');
 const postRoutes = require('./routes/postRoutes');
@@ -13,6 +14,7 @@ const userRoutes = require('./routes/userRoutes');
 const musicRoutes = require('./routes/musicRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const swaggerDocument = require("./swagger-output.json");
 const {initializeSocket} = require("./socket");
 
 const app = express();
@@ -112,6 +114,16 @@ app.use('/music', musicRoutes);
 app.use('/staff', staffRoutes);
 // routes pour la maintenance
 app.use('/maintenance', maintenanceRoutes);
+
+// swagger
+app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerDocument, {
+        customCssUrl:
+            "https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-material.css",
+    }),
+);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
