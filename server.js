@@ -1,12 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
 require('dotenv').config();
-const db = require('./db');
-const {getClientIp} = require("./utils");
 const http = require('http');
-const socketIo = require('socket.io');
 const authRoutes = require('./routes/authRoutes');
 const articleRoutes = require('./routes/articleRoutes');
 const postRoutes = require('./routes/postRoutes');
@@ -16,18 +12,16 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const userRoutes = require('./routes/userRoutes');
 const musicRoutes = require('./routes/musicRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const {initializeSocket} = require("./socket");
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: process.env.FRONTEND_URL,
-        methods: ["GET", "POST"]
-    }
-});
+
+// initialize socket.io
+initializeSocket(server);
 
 const port = process.env.PORT || 3000;
-const secretKey = process.env.SECRET_KEY || 'yourSecretKey';
 
 app.use(bodyParser.json());
 // CORS frontend
@@ -40,39 +34,6 @@ app.use(cors({
 app.use((req, res, next) => {
     req.setTimeout(0); // Désactive le timeout pour chaque requête
     next();
-});
-
-app.get('/maintenance-status', async (req, res) => {
-    try {
-        const [results] = await db.query("SELECT `value` FROM `emulator_settings` WHERE `key` = 'website.maintenance'");
-        const isMaintenance = results.length > 0 && results[0].value === '1';
-
-        // Notify clients if maintenance mode is enabled
-        if (isMaintenance) {
-            io.emit('maintenance', true);
-        }
-
-        res.status(200).send({ maintenance: isMaintenance });
-    } catch (error) {
-        console.error('Error fetching maintenance status:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Ajout de la route /check-ban
-app.get('/check-ban', verifyToken, async (req, res) => {
-    const ip = getClientIp(req);
-    const machineId = req.headers['machine-id'];
-    try {
-        const isBanned = await checkBan(req.userId, ip, machineId);
-        if (isBanned) {
-            return res.status(403).send('User is banned');
-        }
-        res.status(200).send('User is not banned');
-    } catch (err) {
-        console.error('Error checking ban status:', err);
-        res.status(500).send('Server error');
-    }
 });
 
 // Endpoint pour récupérer les posts de l'utilisateur
@@ -130,31 +91,6 @@ app.get('/check-ban', verifyToken, async (req, res) => {
 //     }
 // });
 
-// Middleware de vérification du token
-function verifyToken(req, res, next) {
-    const token = req.headers['x-access-token'];
-    if (!token) return res.status(403).send('No token provided');
-
-    jwt.verify(token, secretKey, async (err, decoded) => {
-        if (err) {
-            if (err.name === 'TokenExpiredError') {
-                // Mettre à jour is_logged_in à 0 lorsque le token est expiré
-                try {
-                    await db.query('UPDATE users SET is_logged_in = 0 WHERE id = ?', [decoded.id]);
-                } catch (updateErr) {
-                    console.error('Error updating is_logged_in on token expiration:', updateErr);
-                }
-                return res.status(401).send('Token expired');
-            } else {
-                return res.status(500).send('Failed to authenticate token');
-            }
-        }
-        req.userId = decoded.id;
-        req.userRank = decoded.rank;
-        next();
-    });
-}
-
 // gestion des routes par modules
 // routes pour authentification
 app.use('/auth', authRoutes);
@@ -174,6 +110,8 @@ app.use('/users', userRoutes);
 app.use('/music', musicRoutes);
 // routes pour le staff
 app.use('/staff', staffRoutes);
+// routes pour la maintenance
+app.use('/maintenance', maintenanceRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {

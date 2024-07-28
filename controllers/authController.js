@@ -107,3 +107,20 @@ exports.generateAntiRobotQuestion = (req, res) => {
     const question = generateAntiRobotQuestion();
     res.status(200).send(question);
 };
+
+exports.checkBan = async (req, res) => {
+    async (req, res) => {
+        const ip = getClientIp(req);
+        const machineId = req.headers['machine-id'];
+        try {
+            const isBanned = await checkBan(req.userId, ip, machineId);
+            if (isBanned) {
+                return res.status(403).send('User is banned');
+            }
+            res.status(200).send('User is not banned');
+        } catch (err) {
+            console.error('Error checking ban status:', err);
+            res.status(500).send('Server error');
+        }
+    }
+};
