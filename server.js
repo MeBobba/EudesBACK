@@ -116,14 +116,14 @@ app.use('/staff', staffRoutes);
 app.use('/maintenance', maintenanceRoutes);
 
 // swagger
-app.use(
-    "/docs",
-    swaggerUi.serve,
-    swaggerUi.setup(swaggerDocument, {
-        customCssUrl:
-            "https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-material.css",
-    }),
-);
+// app.use(
+//     "/docs",
+//     swaggerUi.serve,
+//     swaggerUi.setup(swaggerDocument, {
+//         customCssUrl:
+//             "https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-material.css",
+//     }),
+// );
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
