@@ -7,5 +7,6 @@ router.post('/login', authController.login);
 router.post('/logout', verifyToken, authController.logout);
 router.post('/register', authController.register);
 router.get('/check-session', verifyToken, authController.checkSession);
+router.get('/anti-robot-question', authController.generateAntiRobotQuestion);
 
 module.exports = router;

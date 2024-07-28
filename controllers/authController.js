@@ -93,3 +93,17 @@ exports.register = async (req, res) => {
 exports.checkSession = (req, res) => {
     res.status(200).send({valid: true});
 };
+
+function generateAntiRobotQuestion() {
+    const num1 = Math.floor(Math.random() * 10);
+    const num2 = Math.floor(Math.random() * 10);
+    return {
+        question: `What is ${num1} + ${num2}?`,
+        answer: num1 + num2
+    };
+}
+
+exports.generateAntiRobotQuestion = (req, res) => {
+    const question = generateAntiRobotQuestion();
+    res.status(200).send(question);
+};

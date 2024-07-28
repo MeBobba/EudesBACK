@@ -4,6 +4,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const db = require('./db');
+const {getClientIp} = require("./utils");
 const http = require('http');
 const socketIo = require('socket.io');
 const authRoutes = require('./routes/authRoutes');
@@ -14,7 +15,7 @@ const shopRoutes = require('./routes/shopRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const userRoutes = require('./routes/userRoutes');
 const musicRoutes = require('./routes/musicRoutes');
-const {getClientIp} = require("./utils");
+const staffRoutes = require('./routes/staffRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -41,30 +42,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Endpoint pour mettre à jour les informations d'un utilisateur
-// todo: reactiver ça sinon la page staff marche plus
-// app.put('/users/:userId', verifyToken, async (req, res) => {
-//     const { userId } = req.params;
-//     const { rank, mail, motto } = req.body;
-//
-//     try {
-//         const [result] = await db.query(
-//             'UPDATE users SET rank = ?, mail = ?, motto = ? WHERE id = ?',
-//             [rank, mail, motto, userId]
-//         );
-//
-//         if (result.affectedRows === 0) {
-//             return res.status(404).send('User not found');
-//         }
-//
-//         const [updatedUser] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-//         res.status(200).send(updatedUser[0]);
-//     } catch (err) {
-//         console.error('Error updating user:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
 app.get('/maintenance-status', async (req, res) => {
     try {
         const [results] = await db.query("SELECT `value` FROM `emulator_settings` WHERE `key` = 'website.maintenance'");
@@ -78,32 +55,6 @@ app.get('/maintenance-status', async (req, res) => {
         res.status(200).send({ maintenance: isMaintenance });
     } catch (error) {
         console.error('Error fetching maintenance status:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Endpoint pour récupérer les informations du staff avec noms de rangs
-app.get('/staff', verifyToken, async (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
-    try {
-        const [ranks] = await db.query(
-            'SELECT * FROM permissions WHERE level >= 5 ORDER BY level DESC'
-        );
-
-        const [users] = await db.query(
-            'SELECT * FROM users WHERE rank >= 5 ORDER BY rank DESC LIMIT ? OFFSET ?',
-            [limit, offset]
-        );
-
-        const staffSections = ranks.map(rank => {
-            return { rank_name: rank.rank_name, rank_level: rank.level, users: users.filter(user => user.rank === rank.level) };
-        }).filter(section => section.users.length > 0);
-
-        res.status(200).send({ staffSections, ranks });
-    } catch (err) {
-        console.error('Error fetching staff data:', err);
         res.status(500).send('Server error');
     }
 });
@@ -122,22 +73,6 @@ app.get('/check-ban', verifyToken, async (req, res) => {
         console.error('Error checking ban status:', err);
         res.status(500).send('Server error');
     }
-});
-
-// Fonction pour générer des questions anti-robot
-function generateAntiRobotQuestion() {
-    const num1 = Math.floor(Math.random() * 10);
-    const num2 = Math.floor(Math.random() * 10);
-    return {
-        question: `What is ${num1} + ${num2}?`,
-        answer: num1 + num2
-    };
-}
-
-// Endpoint pour obtenir une question anti-robot
-app.get('/anti-robot-question', (req, res) => {
-    const question = generateAntiRobotQuestion();
-    res.status(200).send(question);
 });
 
 // Endpoint pour récupérer les posts de l'utilisateur
@@ -237,6 +172,8 @@ app.use('/payment', paymentRoutes);
 app.use('/users', userRoutes);
 // routes pour musique
 app.use('/music', musicRoutes);
+// routes pour le staff
+app.use('/staff', staffRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {

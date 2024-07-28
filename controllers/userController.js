@@ -304,3 +304,26 @@ exports.getUserStories = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+
+//TODO: Ajout d'une verif du rank pour l'update
+exports.updateUser = async (req, res) => {
+    const { userId } = req.params;
+    const { rank, mail, motto } = req.body;
+
+    try {
+        const [result] = await db.query(
+            'UPDATE users SET rank = ?, mail = ?, motto = ? WHERE id = ?',
+            [rank, mail, motto, userId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).send('User not found');
+        }
+
+        const [updatedUser] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+        res.status(200).send(updatedUser[0]);
+    } catch (err) {
+        console.error('Error updating user:', err);
+        res.status(500).send('Server error');
+    }
+};

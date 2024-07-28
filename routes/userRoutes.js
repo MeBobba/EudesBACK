@@ -4,6 +4,7 @@ const {verifyToken} = require("../middlewares/authMiddleware");
 const userController = require("../controllers/userController");
 
 router.put('/update-account', verifyToken, userController.updateAccount);
+router.put('/:userId', verifyToken, userController.updateUser);
 router.get('/profile/me', verifyToken, userController.getMyProfile);
 router.get('/profile/:userId', verifyToken, userController.getUserProfile);
 router.get('/photos/:userId', verifyToken, userController.getUserPhotos);
