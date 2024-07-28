@@ -18,7 +18,7 @@ exports.getMyProfile = async (req, res) => {
 exports.getUserProfile = async (req, res) => {
     const { userId } = req.params;
     try {
-        const [users] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+        const [users] = await db.query('SELECT username, motto, look, credits, pixels, points FROM users WHERE id = ?', [userId]);
         if (users.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -305,12 +305,15 @@ exports.getUserStories = async (req, res) => {
     }
 };
 
-//TODO: Ajout d'une verif du rank pour l'update
 exports.updateUser = async (req, res) => {
     const { userId } = req.params;
     const { rank, mail, motto } = req.body;
 
     try {
+        if (req.userRank < 5) {
+            return res.status(403).send('Not authorized to update user');
+        }
+
         const [result] = await db.query(
             'UPDATE users SET rank = ?, mail = ?, motto = ? WHERE id = ?',
             [rank, mail, motto, userId]
