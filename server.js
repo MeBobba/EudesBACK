@@ -42,27 +42,28 @@ app.use((req, res, next) => {
 });
 
 // Endpoint pour mettre à jour les informations d'un utilisateur
-app.put('/users/:userId', verifyToken, async (req, res) => {
-    const { userId } = req.params;
-    const { rank, mail, motto } = req.body;
-
-    try {
-        const [result] = await db.query(
-            'UPDATE users SET rank = ?, mail = ?, motto = ? WHERE id = ?',
-            [rank, mail, motto, userId]
-        );
-
-        if (result.affectedRows === 0) {
-            return res.status(404).send('User not found');
-        }
-
-        const [updatedUser] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-        res.status(200).send(updatedUser[0]);
-    } catch (err) {
-        console.error('Error updating user:', err);
-        res.status(500).send('Server error');
-    }
-});
+// todo: reactiver ça sinon la page staff marche plus
+// app.put('/users/:userId', verifyToken, async (req, res) => {
+//     const { userId } = req.params;
+//     const { rank, mail, motto } = req.body;
+//
+//     try {
+//         const [result] = await db.query(
+//             'UPDATE users SET rank = ?, mail = ?, motto = ? WHERE id = ?',
+//             [rank, mail, motto, userId]
+//         );
+//
+//         if (result.affectedRows === 0) {
+//             return res.status(404).send('User not found');
+//         }
+//
+//         const [updatedUser] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+//         res.status(200).send(updatedUser[0]);
+//     } catch (err) {
+//         console.error('Error updating user:', err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 app.get('/maintenance-status', async (req, res) => {
     try {
@@ -77,20 +78,6 @@ app.get('/maintenance-status', async (req, res) => {
         res.status(200).send({ maintenance: isMaintenance });
     } catch (error) {
         console.error('Error fetching maintenance status:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Endpoint pour obtenir les informations du portefeuille de l'utilisateur
-app.get('/user/wallet', verifyToken, async (req, res) => {
-    try {
-        const [results] = await db.query('SELECT points, credits, pixels FROM users WHERE id = ?', [req.userId]);
-        if (results.length === 0) {
-            return res.status(404).send('User not found');
-        }
-        res.status(200).send(results[0]);
-    } catch (error) {
-        console.error('Error fetching user wallet data:', error);
         res.status(500).send('Server error');
     }
 });
@@ -137,19 +124,6 @@ app.get('/stories/:userId', verifyToken, async (req, res) => {
         res.status(200).send(stories);
     } catch (err) {
         console.error('Error fetching stories:', err);
-        res.status(500).send('Server error');
-    }
-});
-
-app.get('/user/points', verifyToken, async (req, res) => {
-    try {
-        const [results] = await db.query('SELECT points FROM users WHERE id = ?', [req.userId]);
-        if (results.length === 0) {
-            return res.status(404).send('User not found');
-        }
-        res.status(200).send({ points: results[0].points });
-    } catch (error) {
-        console.error('Error fetching user points:', error);
         res.status(500).send('Server error');
     }
 });
@@ -224,19 +198,6 @@ function generateAntiRobotQuestion() {
 app.get('/anti-robot-question', (req, res) => {
     const question = generateAntiRobotQuestion();
     res.status(200).send(question);
-});
-
-// Endpoint pour mettre à jour les données de l'utilisateur
-app.put('/update-account', verifyToken, async (req, res) => {
-    const { username, real_name, mail, motto, look, gender } = req.body;
-    try {
-        await db.query('UPDATE users SET username = ?, real_name = ?, mail = ?, motto = ?, look = ?, gender = ? WHERE id = ?',
-            [username, real_name, mail, motto, look, gender, req.userId]);
-        res.status(200).send('User account updated successfully');
-    } catch (err) {
-        console.error('Error updating user account:', err);
-        res.status(500).send('Server error');
-    }
 });
 
 app.get('/lyrics', async (req, res) => {
@@ -324,18 +285,6 @@ app.get('/lyrics', async (req, res) => {
 //         res.status(500).send('Server error');
 //     }
 // });
-
-// Ajout de la route pour la recherche d'utilisateurs
-app.get('/search-users', verifyToken, async (req, res) => {
-    const { query } = req.query;
-    try {
-        const [results] = await db.query('SELECT id, username FROM users WHERE username LIKE ?', [`%${query}%`]);
-        res.status(200).send(results);
-    } catch (err) {
-        console.error('Error searching users:', err);
-        res.status(500).send('Server error');
-    }
-});
 
 // Tableau de bord utilisateur
 // todo: à quoi ça sert ?? c'est pas sur le front

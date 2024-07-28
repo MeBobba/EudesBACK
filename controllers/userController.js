@@ -56,17 +56,17 @@ exports.downloadUserData = async (req, res) => {
     }
 };
 
-// exports.updateAccount = async (req, res) => {
-//     const { username, real_name, mail, motto, look, gender } = req.body;
-//     try {
-//         await db.query('UPDATE users SET username = ?, real_name = ?, mail = ?, motto = ?, look = ?, gender = ? WHERE id = ?',
-//             [username, real_name, mail, motto, look, gender, req.userId]);
-//         res.status(200).send('User account updated successfully');
-//     } catch (err) {
-//         console.error('Error updating user account:', err);
-//         res.status(500).send('Server error');
-//     }
-// };
+exports.updateAccount = async (req, res) => {
+    const { username, real_name, mail, motto, look, gender } = req.body;
+    try {
+        await db.query('UPDATE users SET username = ?, real_name = ?, mail = ?, motto = ?, look = ?, gender = ? WHERE id = ?',
+            [username, real_name, mail, motto, look, gender, req.userId]);
+        res.status(200).send('User account updated successfully');
+    } catch (err) {
+        console.error('Error updating user account:', err);
+        res.status(500).send('Server error');
+    }
+};
 
 exports.deleteAccount = async (req, res) => {
     const userId = req.userId;
@@ -253,6 +253,43 @@ exports.disable2FA = async (req, res) => {
         res.status(200).send('2FA disabled successfully');
     } catch (err) {
         console.error('Error disabling 2FA:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.searchUsers = async (req, res) => {
+    const { query } = req.query;
+    try {
+        const [results] = await db.query('SELECT id, username FROM users WHERE username LIKE ?', [`%${query}%`]);
+        res.status(200).send(results);
+    } catch (err) {
+        console.error('Error searching users:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.getUserPoints = async (req, res) => {
+    try {
+        const [results] = await db.query('SELECT points FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).send({ points: results[0].points });
+    } catch (error) {
+        console.error('Error fetching user points:', error);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.getUserWallet = async (req, res) => {
+    try {
+        const [results] = await db.query('SELECT points, credits, pixels FROM users WHERE id = ?', [req.userId]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+        res.status(200).send(results[0]);
+    } catch (error) {
+        console.error('Error fetching user wallet data:', error);
         res.status(500).send('Server error');
     }
 };
