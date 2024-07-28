@@ -1,4 +1,6 @@
 const db = require("../db");
+const twofactor = require("node-2fa");
+const qrcode = require("qrcode");
 
 exports.getMyProfile = async (req, res) => {
     try {
@@ -168,6 +170,89 @@ exports.deleteAccount = async (req, res) => {
     } catch (err) {
         await db.query('ROLLBACK');
         console.error('Error deleting user account:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.checkUsername = async (req, res) => {
+    const { username } = req.body;
+    try {
+        const [results] = await db.query('SELECT username FROM users WHERE username = ?', [username]);
+        res.status(200).send({ exists: results.length > 0 });
+    } catch (err) {
+        console.error('Error checking username:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.checkEmail = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const [results] = await db.query('SELECT mail FROM users WHERE mail = ?', [email]);
+        res.status(200).send({ exists: results.length > 0 });
+    } catch (err) {
+        console.error('Error checking email:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.check2FA = async (req, res) => {
+    const { username } = req.query;
+    try {
+        const [results] = await db.query('SELECT is_2fa_enabled FROM users WHERE username = ?', [username]);
+        if (results.length === 0) {
+            return res.status(404).send('User not found');
+        }
+
+        const user = results[0];
+        res.status(200).send({ is2FAEnabled: user.is_2fa_enabled });
+    } catch (err) {
+        console.error('Error checking 2FA status:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.verify2FA = async (req, res) => {
+    const { token } = req.body;
+    try {
+        const [results] = await db.query('SELECT google_auth_secret FROM users WHERE id = ?', [req.userId]);
+        const user = results[0];
+        const verified = twofactor.verifyToken(user.google_auth_secret, token);
+        if (verified) {
+            await db.query('UPDATE users SET is_2fa_enabled = 1 WHERE id = ?', [req.userId]);
+            res.status(200).send('2FA enabled successfully');
+        } else {
+            res.status(400).send('Invalid token');
+        }
+    } catch (err) {
+        console.error('Error verifying 2FA:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.enable2FA = async (req, res) => {
+    const [results] = await db.query('SELECT username FROM users WHERE id = ?', [req.userId]);
+    const username = results[0].username;
+
+    const { secret, uri} = twofactor.generateSecret({ name: 'MeBobba', account: username });
+
+    try {
+        await db.query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret, req.userId]);
+        qrcode.toDataURL(uri, (err, data_url) => {
+            res.status(200).send({ secret: secret, dataURL: data_url });
+        });
+    } catch (err) {
+        console.error('Error enabling 2FA:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.disable2FA = async (req, res) => {
+    try {
+        await db.query('UPDATE users SET is_2fa_enabled = 0, google_auth_secret = NULL WHERE id = ?', [req.userId]);
+        res.status(200).send('2FA disabled successfully');
+    } catch (err) {
+        console.error('Error disabling 2FA:', err);
         res.status(500).send('Server error');
     }
 };
