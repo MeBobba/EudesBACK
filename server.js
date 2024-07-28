@@ -2,8 +2,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const twofactor = require("node-2fa");
-const qrcode = require('qrcode');
 require('dotenv').config();
 const db = require('./db');
 const http = require('http');
@@ -15,6 +13,8 @@ const gameRoutes = require('./routes/gameRoutes');
 const shopRoutes = require('./routes/shopRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const userRoutes = require('./routes/userRoutes');
+const musicRoutes = require('./routes/musicRoutes');
+const {getClientIp} = require("./utils");
 
 const app = express();
 const server = http.createServer(app);
@@ -82,52 +82,6 @@ app.get('/maintenance-status', async (req, res) => {
     }
 });
 
-// Endpoint pour vérifier l'existence d'une piste
-app.get('/tracks/:spotifyId', async (req, res) => {
-    const spotifyId = req.params.spotifyId;
-    try {
-        const [results] = await db.query('SELECT * FROM tracks WHERE spotify_id = ?', [spotifyId]);
-        res.send({ exists: results.length > 0 });
-    } catch (error) {
-        console.error('Error checking track existence:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Endpoint pour stocker une nouvelle piste
-app.post('/tracks', async (req, res) => {
-    const track = req.body;
-    const query = 'INSERT INTO tracks (name, album_id, duration, spotify_popularity, spotify_id, description, image, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())';
-    const values = [
-        track.name,
-        track.album_id,
-        track.duration,
-        track.spotify_popularity,
-        track.spotify_id,
-        track.description,
-        track.image
-    ];
-    try {
-        await db.query(query, values);
-        res.status(201).send('Track stored successfully');
-    } catch (error) {
-        console.error('Error storing track:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Endpoint pour les histoires utilisateur (user stories)
-app.get('/stories/:userId', verifyToken, async (req, res) => {
-    const { userId } = req.params;
-    try {
-        const [stories] = await db.query('SELECT * FROM stories WHERE user_id = ?', [userId]);
-        res.status(200).send(stories);
-    } catch (err) {
-        console.error('Error fetching stories:', err);
-        res.status(500).send('Server error');
-    }
-});
-
 // Endpoint pour récupérer les informations du staff avec noms de rangs
 app.get('/staff', verifyToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
@@ -170,20 +124,6 @@ app.get('/check-ban', verifyToken, async (req, res) => {
     }
 });
 
-// Tableau de bord utilisateur
-app.get('/dashboard', verifyToken, async (req, res) =>  {
-    try {
-        const [results] = await db.query('SELECT * FROM users WHERE id = ?', [req.userId]);
-        if (results.length === 0) {
-            return res.status(404).send('User not found');
-        }
-        res.status(200).send(results[0]);
-    } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        res.status(500).send('Server error');
-    }
-});
-
 // Fonction pour générer des questions anti-robot
 function generateAntiRobotQuestion() {
     const num1 = Math.floor(Math.random() * 10);
@@ -198,22 +138,6 @@ function generateAntiRobotQuestion() {
 app.get('/anti-robot-question', (req, res) => {
     const question = generateAntiRobotQuestion();
     res.status(200).send(question);
-});
-
-app.get('/lyrics', async (req, res) => {
-    const { q_track, q_artist } = req.query;
-    try {
-        const response = await axios.get(`https://api.musixmatch.com/ws/1.1/matcher.lyrics.get`, {
-            params: {
-                q_track,
-                q_artist,
-                apikey: process.env.MUSIXMATCH_API_KEY
-            }
-        });
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).send('Error fetching lyrics');
-    }
 });
 
 // Endpoint pour récupérer les posts de l'utilisateur
@@ -271,37 +195,6 @@ app.get('/lyrics', async (req, res) => {
 //     }
 // });
 
-// Endpoint pour récupérer les photos de l'utilisateur
-// todo: enlever car ça sert à rien le /users/photos le fait déjà
-// app.get('/user-photos', verifyToken, async (req, res) => {
-//     try {
-//         const [photos] = await db.query(
-//             'SELECT id, user_id, room_id, timestamp, url FROM camera_web WHERE user_id = ?',
-//             [req.userId]
-//         );
-//         res.status(200).send(photos);
-//     } catch (err) {
-//         console.error('Error fetching user photos:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// Tableau de bord utilisateur
-// todo: à quoi ça sert ?? c'est pas sur le front
-// app.get('/dashboard/:userId', verifyToken, async (req, res) => {
-//     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
-//     try {
-//         const [results] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-//         if (results.length === 0) {
-//             return res.status(404).send('User not found');
-//         }
-//         res.status(200).send(results[0]);
-//     } catch (err) {
-//         console.error('Error fetching dashboard data:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
-
 // Middleware de vérification du token
 function verifyToken(req, res, next) {
     const token = req.headers['x-access-token'];
@@ -342,6 +235,8 @@ app.use('/shop', shopRoutes);
 app.use('/payment', paymentRoutes);
 // routes pour les utilisateurs
 app.use('/users', userRoutes);
+// routes pour musique
+app.use('/music', musicRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {

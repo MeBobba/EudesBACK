@@ -3,11 +3,11 @@ const router = express.Router();
 const {verifyToken} = require("../middlewares/authMiddleware");
 const userController = require("../controllers/userController");
 
-// why /users/update-account doesn't work?
 router.put('/update-account', verifyToken, userController.updateAccount);
 router.get('/profile/me', verifyToken, userController.getMyProfile);
 router.get('/profile/:userId', verifyToken, userController.getUserProfile);
 router.get('/photos/:userId', verifyToken, userController.getUserPhotos);
+router.get('/stories/:userId', verifyToken, userController.getUserStories);
 router.get('/download-data', verifyToken, userController.downloadUserData);
 router.get('/search', verifyToken, userController.searchUsers);
 router.get('/points', verifyToken, userController.getUserPoints);

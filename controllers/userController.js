@@ -293,3 +293,14 @@ exports.getUserWallet = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+
+exports.getUserStories = async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const [stories] = await db.query('SELECT * FROM stories WHERE user_id = ?', [userId]);
+        res.status(200).send(stories);
+    } catch (err) {
+        console.error('Error fetching stories:', err);
+        res.status(500).send('Server error');
+    }
+};
