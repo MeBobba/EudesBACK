@@ -1,5 +1,4 @@
 const db = require("../db");
-const {exp} = require("qrcode/lib/core/galois-field");
 
 exports.getPostsForUser = async (req, res) => {
     const userId = req.params.userId === 'me' ? req.userId : req.params.userId;
