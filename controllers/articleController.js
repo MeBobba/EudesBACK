@@ -4,10 +4,6 @@ const path = require("path");
 const fs = require("fs");
 
 exports.getArticles = async (req, res) => {
-    // #swagger.tags = ['Articles']
-    /* #swagger.security = [{
-     "bearerAuth": []
-    }] */
     try {
         const [articles] = await db.query('SELECT * FROM articles ORDER BY date DESC');
         res.status(200).send(articles);
@@ -18,7 +14,6 @@ exports.getArticles = async (req, res) => {
 };
 
 exports.getArticle = async (req, res) => {
-    // #swagger.tags = ['Articles']
     const {id} = req.params;
     const userId = req.userId; // Assurez-vous que verifyToken est utilisé pour définir req.userId
     try {
@@ -70,7 +65,6 @@ exports.getArticle = async (req, res) => {
 };
 
 exports.addLike = async (req, res) => {
-    // #swagger.tags = ['Articles']
     const {articleId} = req.params;
     const {isLike} = req.body;
     try {
