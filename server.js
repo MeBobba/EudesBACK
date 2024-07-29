@@ -13,6 +13,7 @@ const userRoutes = require('./routes/userRoutes');
 const musicRoutes = require('./routes/musicRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const headerRoutes = require('./routes/headerRoutes');
 const {initializeSocket} = require("./socket");
 
 const app = express();
@@ -112,6 +113,8 @@ app.use('/music', musicRoutes);
 app.use('/staff', staffRoutes);
 // routes pour la maintenance
 app.use('/maintenance', maintenanceRoutes);
+// routes pour le header
+app.use('/headerimages', headerRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res, next) => {
