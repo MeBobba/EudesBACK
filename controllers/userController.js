@@ -234,7 +234,7 @@ exports.enable2FA = async (req, res) => {
     const [results] = await db.query('SELECT username FROM users WHERE id = ?', [req.userId]);
     const username = results[0].username;
 
-    const { secret, uri} = twofactor.generateSecret({ name: 'MeBobba', account: username });
+    const { secret, uri } = twofactor.generateSecret({ name: 'MeBobba', account: username });
 
     try {
         await db.query('UPDATE users SET google_auth_secret = ? WHERE id = ?', [secret, req.userId]);
@@ -327,6 +327,93 @@ exports.updateUser = async (req, res) => {
         res.status(200).send(updatedUser[0]);
     } catch (err) {
         console.error('Error updating user:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.getFriendSuggestions = async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        // Fetch friends of the user
+        const [friends] = await db.query(`
+            SELECT user_one_id, user_two_id 
+            FROM messenger_friendships 
+            WHERE user_one_id = ? OR user_two_id = ?
+        `, [userId, userId]);
+
+        // Extract friend IDs
+        const friendIds = friends.map(f => f.user_one_id === userId ? f.user_two_id : f.user_one_id);
+
+        // Fetch pending friend requests
+        const [pendingRequests] = await db.query(`
+            SELECT user_to_id 
+            FROM messenger_friendrequests 
+            WHERE user_from_id = ?
+        `, [userId]);
+
+        // Extract pending request IDs
+        const pendingRequestIds = pendingRequests.map(r => r.user_to_id);
+
+        // Fetch user details
+        const [userDetails] = await db.query(`
+            SELECT credits, pixels 
+            FROM users 
+            WHERE id = ?
+        `, [userId]);
+
+        if (!userDetails.length) {
+            return res.status(404).send('User not found');
+        }
+
+        const { credits, pixels } = userDetails[0];
+
+        // Build the SQL query for suggestions
+        let query = `
+            SELECT id, username, look, 
+            CASE WHEN id IN (?) THEN 'pending' ELSE 'not_requested' END as request_status
+            FROM users 
+            WHERE id != ? 
+        `;
+
+        const queryParams = [pendingRequestIds.length ? pendingRequestIds : [-1], userId];
+
+        if (friendIds.length > 0) {
+            query += `AND id NOT IN (?) `;
+            queryParams.push(friendIds);
+        }
+
+        query += `
+            ORDER BY ABS(credits - ?) + ABS(pixels - ?) ASC 
+            LIMIT 5
+        `;
+
+        queryParams.push(credits, pixels);
+
+        // Fetch users who are not friends with the current user
+        const [suggestions] = await db.query(query, queryParams);
+
+        res.status(200).send(suggestions);
+    } catch (err) {
+        console.error('Error fetching friend suggestions:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.followUser = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { userId: followUserId } = req.body;
+
+        // Insert a friend request record
+        await db.query(`
+            INSERT INTO messenger_friendrequests (user_from_id, user_to_id) 
+            VALUES (?, ?)
+        `, [userId, followUserId]);
+
+        res.status(200).send('Follow request sent successfully');
+    } catch (err) {
+        console.error('Error sending follow request:', err);
         res.status(500).send('Server error');
     }
 };

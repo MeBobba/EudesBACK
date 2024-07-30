@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {verifyToken} = require("../middlewares/authMiddleware");
+const { verifyToken } = require("../middlewares/authMiddleware");
 const userController = require("../controllers/userController");
 
 router.put('/update-account', verifyToken, userController.updateAccount);
@@ -21,5 +21,8 @@ router.post('/check-email', userController.checkEmail);
 router.post('/verify-2fa', verifyToken, userController.verify2FA);
 router.post('/enable-2fa', verifyToken, userController.enable2FA);
 router.post('/disable-2fa', verifyToken, userController.disable2FA);
+router.get('/suggestions', verifyToken, userController.getFriendSuggestions);
+router.post('/follow', verifyToken, userController.followUser);
+
 
 module.exports = router;
