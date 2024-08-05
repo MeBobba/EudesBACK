@@ -4,12 +4,17 @@ const twofactor = require("node-2fa");
 const jwt = require("jsonwebtoken");
 const { getClientIp, checkBan } = require("../utils");
 const tf = require('@tensorflow/tfjs-node');
+require('@tensorflow/tfjs-backend-wasm');
 const faceapi = require('@vladmandic/face-api');
 const canvas = require('canvas');
 
 faceapi.env.monkeyPatch({ Canvas: canvas.Canvas, Image: canvas.Image });
 
 const secretKey = process.env.SECRET_KEY || 'yourSecretKey';
+
+tf.setBackend('wasm').then(() => {
+    console.log('WASM backend set');
+});
 
 exports.login = async (req, res) => {
     const { username, password, token2fa, machine_id } = req.body;

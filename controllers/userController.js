@@ -2,10 +2,15 @@ const db = require("../db");
 const twofactor = require("node-2fa");
 const qrcode = require("qrcode");
 const tf = require('@tensorflow/tfjs-node');
+require('@tensorflow/tfjs-backend-wasm');
 const faceapi = require('@vladmandic/face-api');
 const canvas = require('canvas');
 
 faceapi.env.monkeyPatch({ Canvas: canvas.Canvas, Image: canvas.Image, ImageData: canvas.ImageData });
+
+tf.setBackend('wasm').then(() => {
+    console.log('WASM backend set');
+});
 
 exports.getMyProfile = async (req, res) => {
     try {
