@@ -2,25 +2,10 @@ const db = require("../db");
 const twofactor = require("node-2fa");
 const qrcode = require("qrcode");
 const tf = require('@tensorflow/tfjs-node');
-require('@tensorflow/tfjs-backend-wasm');
 const faceapi = require('@vladmandic/face-api');
 const canvas = require('canvas');
 
-console.log("Dependencies required");
-
 faceapi.env.monkeyPatch({ Canvas: canvas.Canvas, Image: canvas.Image, ImageData: canvas.ImageData });
-
-console.log("Setting backend to WASM");
-tf.setBackend('wasm').then(() => {
-    console.log('WASM backend set');
-
-    // Your TensorFlow.js code here
-    console.log("Ready to start application logic");
-
-    // Your existing code...
-}).catch(err => {
-    console.error("Error setting backend to WASM:", err);
-});
 
 exports.getMyProfile = async (req, res) => {
     try {
