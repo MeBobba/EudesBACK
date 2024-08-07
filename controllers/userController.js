@@ -1,10 +1,176 @@
 const db = require("../db");
 const twofactor = require("node-2fa");
 const qrcode = require("qrcode");
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const multer = require('multer');
+const path = require('path');
+const crypto = require('crypto');
+const { promisify } = require('util');
+
+const randomBytes = promisify(crypto.randomBytes);
+
+// Configuration de multer pour traiter les fichiers en mémoire
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+exports.uploadProfileImage = upload.single('profileImage');
+exports.uploadCoverImage = upload.single('coverImage');
+
+const s3 = new S3Client({
+    region: process.env.VUE_APP_AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.VUE_APP_AWS_ACCESS_KEY,
+        secretAccessKey: process.env.VUE_APP_AWS_SECRET_KEY,
+    },
+});
+
+const uploadToS3 = async (file, folder) => {
+    const rawBytes = await randomBytes(16);
+    const fileName = folder + '/' + rawBytes.toString('hex') + path.extname(file.originalname);
+
+    const command = new PutObjectCommand({
+        Bucket: process.env.VUE_APP_S3_BUCKET,
+        Key: fileName,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+        ACL: 'public-read',
+    });
+
+    await s3.send(command);
+
+    return `https://${process.env.VUE_APP_S3_BUCKET}.s3.${process.env.VUE_APP_AWS_REGION}.amazonaws.com/${fileName}`;
+};
+
+const deleteFromS3 = async (fileUrl) => {
+    const urlParts = fileUrl.split('/');
+    const key = urlParts.slice(3).join('/'); // Extract the S3 key from the URL
+
+    const command = new DeleteObjectCommand({
+        Bucket: process.env.VUE_APP_S3_BUCKET,
+        Key: key,
+    });
+
+    await s3.send(command);
+};
+
+exports.updateProfileImage = async (req, res) => {
+    try {
+        let profileImageUrl = null;
+        if (req.file) {
+            profileImageUrl = await uploadToS3(req.file, 'profileImages');
+        }
+
+        const [userResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const user = userResults[0];
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        if (profileImageUrl) {
+            await db.query('UPDATE users SET profile_image = ? WHERE id = ?', [profileImageUrl, req.userId]);
+        }
+
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const updatedUser = updatedUserResults[0];
+
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+    } catch (err) {
+        console.error('Error updating profile image:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.updateCoverImage = async (req, res) => {
+    try {
+        let coverImageUrl = null;
+        if (req.file) {
+            coverImageUrl = await uploadToS3(req.file, 'coverImages');
+        }
+
+        const [userResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const user = userResults[0];
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        if (coverImageUrl) {
+            await db.query('UPDATE users SET cover_image = ? WHERE id = ?', [coverImageUrl, req.userId]);
+        }
+
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const updatedUser = updatedUserResults[0];
+
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+    } catch (err) {
+        console.error('Error updating cover image:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.resetProfileImage = async (req, res) => {
+    try {
+        const [userResults] = await db.query('SELECT profile_image FROM users WHERE id = ?', [req.userId]);
+        const user = userResults[0];
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        if (user.profile_image) {
+            try {
+                await deleteFromS3(user.profile_image);
+            } catch (error) {
+                console.error('Error deleting profile image from S3:', error);
+            }
+        }
+
+        await db.query('UPDATE users SET profile_image = NULL WHERE id = ?', [req.userId]);
+
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const updatedUser = updatedUserResults[0];
+
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+    } catch (err) {
+        console.error('Error resetting profile image:', err);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.resetCoverImage = async (req, res) => {
+    try {
+        const [userResults] = await db.query('SELECT cover_image FROM users WHERE id = ?', [req.userId]);
+        const user = userResults[0];
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        if (user.cover_image) {
+            try {
+                await deleteFromS3(user.cover_image);
+            } catch (error) {
+                console.error('Error deleting cover image from S3:', error);
+            }
+        }
+
+        await db.query('UPDATE users SET cover_image = NULL WHERE id = ?', [req.userId]);
+
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const updatedUser = updatedUserResults[0];
+
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+    } catch (err) {
+        console.error('Error resetting cover image:', err);
+        res.status(500).send('Server error');
+    }
+};
 
 exports.getMyProfile = async (req, res) => {
     try {
-        const [results] = await db.query('SELECT * FROM users WHERE id = ?', [req.userId]);
+        const [results] = await db.query('SELECT id, username, profile_image, cover_image, credits, pixels, points, motto, look FROM users WHERE id = ?', [req.userId]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -18,7 +184,7 @@ exports.getMyProfile = async (req, res) => {
 exports.getUserProfile = async (req, res) => {
     const { userId } = req.params;
     try {
-        const [users] = await db.query('SELECT username, motto, look, credits, pixels, points FROM users WHERE id = ?', [userId]);
+        const [users] = await db.query('SELECT id, username, profile_image, cover_image, motto, look, credits, pixels, points FROM users WHERE id = ?', [userId]);
         if (users.length === 0) {
             return res.status(404).send('User not found');
         }

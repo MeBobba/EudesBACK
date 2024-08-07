@@ -23,6 +23,9 @@ router.post('/enable-2fa', verifyToken, userController.enable2FA);
 router.post('/disable-2fa', verifyToken, userController.disable2FA);
 router.get('/suggestions', verifyToken, userController.getFriendSuggestions);
 router.post('/follow', verifyToken, userController.followUser);
-
+router.put('/profile/me/profile', verifyToken, userController.uploadProfileImage, userController.updateProfileImage);
+router.put('/profile/me/cover', verifyToken, userController.uploadCoverImage, userController.updateCoverImage);
+router.delete('/profile/me/profile', verifyToken, userController.resetProfileImage);
+router.delete('/profile/me/cover', verifyToken, userController.resetCoverImage);
 
 module.exports = router;
