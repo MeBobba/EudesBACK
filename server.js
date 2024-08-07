@@ -24,9 +24,7 @@ initializeSocket(server);
 
 const port = process.env.PORT || 3000;
 
-// Augmente la taille maximale des requêtes JSON à 50 Mo
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use(bodyParser.json());
 // CORS frontend
 app.use(cors({
     origin: process.env.FRONTEND_URL,

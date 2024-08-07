@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require("../middlewares/authMiddleware");
 const userController = require("../controllers/userController");
-const authController = require('../controllers/authController'); // Assurez-vous que authController est bien importé
 
 router.put('/update-account', verifyToken, userController.updateAccount);
 router.put('/:userId', verifyToken, userController.updateUser);
@@ -24,8 +23,6 @@ router.post('/enable-2fa', verifyToken, userController.enable2FA);
 router.post('/disable-2fa', verifyToken, userController.disable2FA);
 router.get('/suggestions', verifyToken, userController.getFriendSuggestions);
 router.post('/follow', verifyToken, userController.followUser);
-router.post('/enable-face-id', verifyToken, userController.enableFaceId);
-router.post('/disable-face-id', verifyToken, userController.disableFaceId);
-router.post('/login-face', authController.loginWithFace); // Utilisation de authController pour loginWithFace
+
 
 module.exports = router;

@@ -1,11 +1,6 @@
 const db = require("../db");
 const twofactor = require("node-2fa");
 const qrcode = require("qrcode");
-const tf = require('@tensorflow/tfjs-node');
-const faceapi = require('@vladmandic/face-api');
-const canvas = require('canvas');
-
-faceapi.env.monkeyPatch({ Canvas: canvas.Canvas, Image: canvas.Image, ImageData: canvas.ImageData });
 
 exports.getMyProfile = async (req, res) => {
     try {
@@ -16,28 +11,6 @@ exports.getMyProfile = async (req, res) => {
         res.status(200).send(results[0]);
     } catch (err) {
         console.error('Error fetching user profile:', err);
-        res.status(500).send('Server error');
-    }
-};
-
-exports.enableFaceId = async (req, res) => {
-    const { image } = req.body;
-    try {
-        const faceDescriptors = await getFaceDescriptor(image);
-        await db.query('UPDATE users SET is_face_id_enabled = 1, face_id_image = ? WHERE id = ?', [faceDescriptors.toString(), req.userId]);
-        res.status(200).send('Face ID enabled successfully');
-    } catch (err) {
-        console.error('Error enabling Face ID:', err);
-        res.status(500).send('Server error');
-    }
-};
-
-exports.disableFaceId = async (req, res) => {
-    try {
-        await db.query('UPDATE users SET is_face_id_enabled = 0, face_id_image = NULL WHERE id = ?', [req.userId]);
-        res.status(200).send('Face ID disabled successfully');
-    } catch (err) {
-        console.error('Error disabling Face ID:', err);
         res.status(500).send('Server error');
     }
 };
@@ -444,18 +417,3 @@ exports.followUser = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
-
-async function getFaceDescriptor(image) {
-    await faceapi.nets.ssdMobilenetv1.loadFromDisk('models');
-    await faceapi.nets.faceLandmark68Net.loadFromDisk('models');
-    await faceapi.nets.faceRecognitionNet.loadFromDisk('models');
-
-    const img = await canvas.loadImage(image);
-    const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-
-    if (!detections) {
-        throw new Error('Face not detected');
-    }
-
-    return detections.descriptor;
-}
