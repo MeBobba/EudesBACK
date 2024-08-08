@@ -2,13 +2,24 @@ const db = require("../db");
 const twofactor = require("node-2fa");
 const qrcode = require("qrcode");
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const vision = require('@google-cloud/vision');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const { promisify } = require('util');
+require('dotenv').config();
 
 const randomBytes = promisify(crypto.randomBytes);
+
+// Initialiser l'instance S3
+const s3 = new S3Client({
+    region: process.env.VUE_APP_AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.VUE_APP_AWS_ACCESS_KEY,
+        secretAccessKey: process.env.VUE_APP_AWS_SECRET_KEY,
+    },
+});
 
 // Configuration de multer pour traiter les fichiers en mémoire
 const storage = multer.memoryStorage();
@@ -17,12 +28,8 @@ const upload = multer({ storage: storage });
 exports.uploadProfileImage = upload.single('profileImage');
 exports.uploadCoverImage = upload.single('coverImage');
 
-const s3 = new S3Client({
-    region: process.env.VUE_APP_AWS_REGION,
-    credentials: {
-        accessKeyId: process.env.VUE_APP_AWS_ACCESS_KEY,
-        secretAccessKey: process.env.VUE_APP_AWS_SECRET_KEY,
-    },
+const client = new vision.ImageAnnotatorClient({
+    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
 });
 
 const uploadToS3 = async (file, folder) => {
@@ -42,16 +49,14 @@ const uploadToS3 = async (file, folder) => {
     return `https://${process.env.VUE_APP_S3_BUCKET}.s3.${process.env.VUE_APP_AWS_REGION}.amazonaws.com/${fileName}`;
 };
 
-const deleteFromS3 = async (fileUrl) => {
-    const urlParts = fileUrl.split('/');
-    const key = urlParts.slice(3).join('/'); // Extract the S3 key from the URL
+const analyzeImage = async (imageUrl) => {
+    const [result] = await client.safeSearchDetection(imageUrl);
+    const detections = result.safeSearchAnnotation;
 
-    const command = new DeleteObjectCommand({
-        Bucket: process.env.VUE_APP_S3_BUCKET,
-        Key: key,
-    });
-
-    await s3.send(command);
+    return {
+        isAdult: detections ? (detections.adult === 'LIKELY' || detections.adult === 'VERY_LIKELY') : false,
+        isViolent: detections ? (detections.violence === 'LIKELY' || detections.violence === 'VERY_LIKELY') : false,
+    };
 };
 
 exports.updateProfileImage = async (req, res) => {
@@ -69,13 +74,18 @@ exports.updateProfileImage = async (req, res) => {
         }
 
         if (profileImageUrl) {
-            await db.query('UPDATE users SET profile_image = ? WHERE id = ?', [profileImageUrl, req.userId]);
+            const analysis = await analyzeImage(profileImageUrl);
+            const isBlurred = analysis.isAdult || analysis.isViolent;
+            await db.query('INSERT INTO user_images (user_id, image_url, is_adult, is_violent, is_blurred) VALUES (?, ?, ?, ?, ?)',
+                [req.userId, profileImageUrl, analysis.isAdult, analysis.isViolent, isBlurred]);
+
+            await db.query('UPDATE users SET profile_image = ?, profile_image_blurred = ? WHERE id = ?', [profileImageUrl, isBlurred, req.userId]);
         }
 
-        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image, profile_image_blurred FROM users WHERE id = ?', [req.userId]);
         const updatedUser = updatedUserResults[0];
 
-        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image, profileImageBlurred: updatedUser.profile_image_blurred });
     } catch (err) {
         console.error('Error updating profile image:', err);
         res.status(500).send('Server error');
@@ -97,13 +107,18 @@ exports.updateCoverImage = async (req, res) => {
         }
 
         if (coverImageUrl) {
-            await db.query('UPDATE users SET cover_image = ? WHERE id = ?', [coverImageUrl, req.userId]);
+            const analysis = await analyzeImage(coverImageUrl);
+            const isBlurred = analysis.isAdult || analysis.isViolent;
+            await db.query('INSERT INTO user_images (user_id, image_url, is_adult, is_violent, is_blurred) VALUES (?, ?, ?, ?, ?)',
+                [req.userId, coverImageUrl, analysis.isAdult, analysis.isViolent, isBlurred]);
+
+            await db.query('UPDATE users SET cover_image = ?, cover_image_blurred = ? WHERE id = ?', [coverImageUrl, isBlurred, req.userId]);
         }
 
-        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image, cover_image_blurred FROM users WHERE id = ?', [req.userId]);
         const updatedUser = updatedUserResults[0];
 
-        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image, coverImageBlurred: updatedUser.cover_image_blurred });
     } catch (err) {
         console.error('Error updating cover image:', err);
         res.status(500).send('Server error');
