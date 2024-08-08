@@ -75,7 +75,7 @@ exports.updateProfileImage = async (req, res) => {
 
         if (profileImageUrl) {
             const analysis = await analyzeImage(profileImageUrl);
-            const isBlurred = analysis.isAdult || analysis.isViolent;
+            const isBlurred = analysis.isAdult || analysis.isViolent ? 1 : 0;
             await db.query('INSERT INTO user_images (user_id, image_url, is_adult, is_violent, is_blurred) VALUES (?, ?, ?, ?, ?)',
                 [req.userId, profileImageUrl, analysis.isAdult, analysis.isViolent, isBlurred]);
 
@@ -108,7 +108,7 @@ exports.updateCoverImage = async (req, res) => {
 
         if (coverImageUrl) {
             const analysis = await analyzeImage(coverImageUrl);
-            const isBlurred = analysis.isAdult || analysis.isViolent;
+            const isBlurred = analysis.isAdult || analysis.isViolent ? 1 : 0;
             await db.query('INSERT INTO user_images (user_id, image_url, is_adult, is_violent, is_blurred) VALUES (?, ?, ?, ?, ?)',
                 [req.userId, coverImageUrl, analysis.isAdult, analysis.isViolent, isBlurred]);
 
@@ -142,12 +142,12 @@ exports.resetProfileImage = async (req, res) => {
             }
         }
 
-        await db.query('UPDATE users SET profile_image = NULL WHERE id = ?', [req.userId]);
+        await db.query('UPDATE users SET profile_image = NULL, profile_image_blurred = 0 WHERE id = ?', [req.userId]);
 
-        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image, profile_image_blurred FROM users WHERE id = ?', [req.userId]);
         const updatedUser = updatedUserResults[0];
 
-        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image, profileImageBlurred: updatedUser.profile_image_blurred });
     } catch (err) {
         console.error('Error resetting profile image:', err);
         res.status(500).send('Server error');
@@ -171,12 +171,12 @@ exports.resetCoverImage = async (req, res) => {
             }
         }
 
-        await db.query('UPDATE users SET cover_image = NULL WHERE id = ?', [req.userId]);
+        await db.query('UPDATE users SET cover_image = NULL, cover_image_blurred = 0 WHERE id = ?', [req.userId]);
 
-        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image FROM users WHERE id = ?', [req.userId]);
+        const [updatedUserResults] = await db.query('SELECT profile_image, cover_image, cover_image_blurred FROM users WHERE id = ?', [req.userId]);
         const updatedUser = updatedUserResults[0];
 
-        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image });
+        res.status(200).json({ profileImage: updatedUser.profile_image, coverImage: updatedUser.cover_image, coverImageBlurred: updatedUser.cover_image_blurred });
     } catch (err) {
         console.error('Error resetting cover image:', err);
         res.status(500).send('Server error');
@@ -185,7 +185,7 @@ exports.resetCoverImage = async (req, res) => {
 
 exports.getMyProfile = async (req, res) => {
     try {
-        const [results] = await db.query('SELECT id, username, profile_image, cover_image, credits, pixels, points, motto, look FROM users WHERE id = ?', [req.userId]);
+        const [results] = await db.query('SELECT id, username, profile_image, cover_image, credits, pixels, points, motto, look, profile_image_blurred, cover_image_blurred FROM users WHERE id = ?', [req.userId]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
@@ -199,7 +199,7 @@ exports.getMyProfile = async (req, res) => {
 exports.getUserProfile = async (req, res) => {
     const { userId } = req.params;
     try {
-        const [users] = await db.query('SELECT id, username, profile_image, cover_image, motto, look, credits, pixels, points FROM users WHERE id = ?', [userId]);
+        const [users] = await db.query('SELECT id, username, profile_image, cover_image, motto, look, credits, pixels, points, profile_image_blurred, cover_image_blurred FROM users WHERE id = ?', [userId]);
         if (users.length === 0) {
             return res.status(404).send('User not found');
         }
