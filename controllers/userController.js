@@ -185,7 +185,11 @@ exports.resetCoverImage = async (req, res) => {
 
 exports.getMyProfile = async (req, res) => {
     try {
+<<<<<<< Updated upstream
         const [results] = await db.query('SELECT id, username, profile_image, cover_image, credits, pixels, points, motto, rank, look, profile_image_blurred, cover_image_blurred FROM users WHERE id = ?', [req.userId]);
+=======
+        const [results] = await db.query('SELECT id, username, profile_image, cover_image, credits, pixels, points, motto, look, profile_image_blurred, cover_image_blurred, rank FROM users WHERE id = ?', [req.userId]);
+>>>>>>> Stashed changes
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }

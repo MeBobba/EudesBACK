@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 require('dotenv').config();
 const http = require('http');
+const axios = require('axios'); // Ajouté pour les requêtes proxy
 const authRoutes = require('./routes/authRoutes');
 const articleRoutes = require('./routes/articleRoutes');
 const postRoutes = require('./routes/postRoutes');
@@ -14,7 +15,7 @@ const musicRoutes = require('./routes/musicRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
 const headerRoutes = require('./routes/headerRoutes');
-const {initializeSocket} = require("./socket");
+const { initializeSocket } = require("./socket");
 
 const app = express();
 const server = http.createServer(app);
@@ -37,60 +38,17 @@ app.use((req, res, next) => {
     next();
 });
 
-// Endpoint pour récupérer les posts de l'utilisateur
-// todo: à quoi ça sert ?? c'est pas sur le front
-// app.get('/posts', verifyToken, async (req, res) => {
-//     try {
-//         const [posts] = await db.query(
-//             `SELECT posts.*,
-//                     users.username,
-//                     users.look,
-//                     COALESCE(likesCount.likesCount, 0)       as likesCount,
-//                     COALESCE(commentsCount.commentsCount, 0) as commentsCount,
-//                     userLikes.is_like                        as userLike
-//              FROM posts
-//                       JOIN users ON posts.user_id = users.id
-//                       LEFT JOIN (SELECT post_id, COUNT(*) as likesCount
-//                                  FROM likes
-//                                  WHERE is_like = true
-//                                  GROUP BY post_id) likesCount ON posts.id = likesCount.post_id
-//                       LEFT JOIN (SELECT post_id, COUNT(*) as commentsCount
-//                                  FROM comments
-//                                  GROUP BY post_id) commentsCount ON posts.id = commentsCount.post_id
-//                       LEFT JOIN (SELECT post_id, is_like
-//                                  FROM likes
-//                                  WHERE user_id = ?) userLikes ON posts.id = userLikes.post_id
-//              WHERE posts.user_id = ?
-//                 OR posts.visibility = "public"
-//                 OR (posts.visibility = "friends" AND posts.user_id IN (SELECT CASE
-//                                                                                   WHEN user_one_id = ? THEN user_two_id
-//                                                                                   WHEN user_two_id = ? THEN user_one_id
-//                                                                                   END AS friend_id
-//                                                                        FROM messenger_friendships
-//                                                                        WHERE user_one_id = ?
-//                                                                           OR user_two_id = ?))
-//              ORDER BY posts.created_at DESC`,
-//             [req.userId, req.userId, req.userId, req.userId, req.userId, req.userId]
-//         );
-//
-//         for (let post of posts) {
-//             const [comments] = await db.query(
-//                 `SELECT comments.*, users.username, users.look
-//                  FROM comments
-//                           JOIN users ON comments.user_id = users.id
-//                  WHERE comments.post_id = ?
-//                  ORDER BY comments.created_at DESC`,
-//                 [post.id]
-//             );
-//             post.comments = comments;
-//         }
-//
-//         res.status(200).send(posts);
-//     } catch (err) {
-//         console.error('Error fetching posts:', err);
-//         res.status(500).send('Server error');
-//     }
-// });
+// Proxy route for Genius API
+app.get('/api/proxy', async (req, res) => {
+    const { url } = req.query;
+    try {
+        const response = await axios.get(url);
+        res.send(response.data);
+    } catch (error) {
+        console.error('Error fetching the URL:', error);
+        res.status(500).send('Error fetching the URL');
+    }
+});
 
 // gestion des routes par modules
 // routes pour authentification

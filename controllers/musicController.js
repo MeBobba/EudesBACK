@@ -3,6 +3,7 @@ const db = require("../db");
 
 exports.getLyrics = async (req, res) => {
     const { q_track, q_artist } = req.query;
+    res.set('Access-Control-Allow-Origin', '*'); // Ajout de cette ligne
     try {
         const response = await axios.get(`https://api.musixmatch.com/ws/1.1/matcher.lyrics.get`, {
             params: {
