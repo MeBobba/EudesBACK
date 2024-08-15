@@ -122,15 +122,30 @@ exports.unlock = async (req, res) => {
     const { password } = req.body;
     const userId = req.userId; // assurez-vous que req.userId est bien défini par le middleware verifyToken
     try {
-        const [results] = await db.query('SELECT password FROM users WHERE id = ?', [userId]);
+        // Récupérer les informations utilisateur, y compris le mot de passe et la dernière activité
+        const [results] = await db.query('SELECT password, last_activity FROM users WHERE id = ?', [userId]);
         if (results.length === 0) {
             return res.status(404).send('User not found');
         }
         const user = results[0];
+
+        // Vérifiez si l'utilisateur est resté inactif pendant plus de 5 heures (ou une autre durée souhaitée)
+        const inactivityLimit = 5 * 60 * 60 * 1000; // 5 heures en millisecondes
+        const now = Date.now();
+        if (now - new Date(user.last_activity).getTime() > inactivityLimit) {
+            // Invalidating the token or logging out the user
+            return res.status(401).send('Session expired due to inactivity. Please log in again.');
+        }
+
+        // Vérifiez si le mot de passe correspond
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).send('Invalid password');
         }
+
+        // Mettre à jour l'activité de l'utilisateur
+        await db.query('UPDATE users SET last_activity = ? WHERE id = ?', [new Date(), userId]);
+
         res.status(200).send({ success: true });
     } catch (err) {
         console.error('Error unlocking:', err);
