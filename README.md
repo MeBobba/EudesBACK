@@ -65,7 +65,7 @@ EudesBack uses several essential Node.js packages, including:
 
 ## 🧑‍💻 Contributing
 
-Currently, we are not looking for contributors as the project is maintained by **notaryz** and **Swayn**. However, you can follow the project to stay updated on future developments.
+Currently, we are not looking for contributors as the project is maintained by **notaryz** and **Christopher Cavalli**. However, you can follow the project to stay updated on future developments.
 
 ## 📄 License
 
